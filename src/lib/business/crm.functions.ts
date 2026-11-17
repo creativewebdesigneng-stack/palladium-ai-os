@@ -6,7 +6,7 @@
  */
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
 
 type Sb = { from: (t: string) => any };
 
@@ -28,7 +28,7 @@ function clean(value: unknown) {
 }
 
 export const listCrm = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("crm")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const [contactsRes, activitiesRes] = await Promise.all([
@@ -64,7 +64,7 @@ export const listCrm = createServerFn({ method: "POST" })
   });
 
 export const saveContact = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("crm")])
   .inputValidator((data: unknown) => contactInput.parse(data))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -101,7 +101,7 @@ export const saveContact = createServerFn({ method: "POST" })
   });
 
 export const deleteContact = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("crm")])
   .inputValidator((data: unknown) => z.object({ id: z.string().uuid() }).parse(data))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -111,7 +111,7 @@ export const deleteContact = createServerFn({ method: "POST" })
   });
 
 export const logActivity = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("crm")])
   .inputValidator((data: unknown) =>
     z
       .object({
