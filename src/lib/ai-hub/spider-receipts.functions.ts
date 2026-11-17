@@ -1,5 +1,5 @@
 import { createServerFn } from '@tanstack/react-start'
-import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware'
+import { requireSupabaseAuth } from '@/lib/launch/launch-auth-middleware'
 import { toAiHubSpiderReceipts } from './spider-receipts'
 
 type Sb = { from: (table: string) => any }
