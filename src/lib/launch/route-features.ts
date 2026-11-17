@@ -27,10 +27,13 @@ const ROUTE_FEATURES: Record<string, FeatureId> = {
   "/developer": "developer_tools", "/developer-workspace": "developer_tools",
   "/developer-portal": "developer_tools", "/voice-studio": "communications",
   "/trusted-social-video": "communications", "/phone-communications": "communications",
-  "/security": "security", "/compliance-sentinel": "security",
+  "/security": "security", "/compliance-sentinel": "security", "/legal-hub": "security",
   "/projects": "projects", "/tasks": "projects", "/team": "projects",
   "/notifications": "notifications", "/support": "notifications", "/help": "notifications",
   "/settings": "settings", "/organisation": "settings",
+  "/health-fitness": "health_fitness", "/fitness-studio": "health_fitness",
+  "/game-foundry": "creative_studio", "/three-d-studio": "creative_studio",
+  "/industry-hub": "business_hub", "/construction-industrial-hub": "business_hub",
 };
 
 export function featureForPath(pathname: string): FeatureId | null {
