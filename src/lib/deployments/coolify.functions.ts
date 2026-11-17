@@ -1,6 +1,6 @@
 import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
-import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
+import { requireLaunchFeatureAuth } from '@/integrations/supabase/auth-middleware';
 import { writeAudit,writeAuditRequired } from '@/lib/platform/audit.server';
 import {isPlatformAdmin} from '@/lib/marketplace/marketplace.server';
 import {providerEndpoint,requestProviderJson} from '@/lib/security/provider-http.server';
@@ -21,7 +21,7 @@ async function requireDeploymentAdmin(sb:Sb,userId:string){
 }
 
 export const getDeploymentOverview = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("developer_tools")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const { data, error } = await sb.from('deployment_targets').select('*').eq('user_id', context.userId).order('created_at', { ascending: false });
@@ -30,7 +30,7 @@ export const getDeploymentOverview = createServerFn({ method: 'POST' })
   });
 
 export const saveDeploymentTarget = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("developer_tools")])
   .inputValidator((input: unknown) => z.object({ name: z.string().trim().min(1).max(100), resourceKind: kindSchema, resourceUuid: z.string().trim().min(3).max(200) }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -44,7 +44,7 @@ export const saveDeploymentTarget = createServerFn({ method: 'POST' })
   });
 
 export const triggerCoolifyDeployment = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("developer_tools")])
   .inputValidator((input: unknown) => z.object({ id: z.string().uuid(), action: z.enum(['deploy','restart','stop']) }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
