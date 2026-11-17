@@ -1,5 +1,5 @@
 import { createServerFn } from '@tanstack/react-start';
-import { requireLaunchFeatureAuth } from '@/integrations/supabase/auth-middleware';
+import { requireLaunchFeatureAuth } from '@/lib/launch/launch-auth-middleware';
 import { buildWorkforceOperatingState } from './workforce-os';
 
 type Sb = { from: (table: string) => any };
