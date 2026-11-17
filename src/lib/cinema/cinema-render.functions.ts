@@ -1,6 +1,6 @@
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
-import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware'
+import { requireSupabaseAuth } from '@/lib/launch/launch-auth-middleware'
 import { getGenerativeMediaCapabilities, getGenerativeMediaJob, submitGenerativeMediaJob } from '@/lib/media/generative-media.server'
 
 type Sb={from:(table:string)=>any}
