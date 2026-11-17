@@ -104,7 +104,8 @@ Optional feature flags:
 
 ## Release gates still outstanding
 
-- Full server-side feature enforcement is not yet wired into every API route, server action, MCP tool and agent executor. The agent streaming endpoint is protected, but other execution surfaces require a route-by-route pass.
+- The agent streaming and steering endpoints return 403 when agent runtime is disabled.
+- Public developer API endpoints for agents, tasks, workflows, workforces, marketplace and usage now use the feature-aware API auth middleware and return 403 before handler execution when their feature is unavailable.
 - The app shell, sidebar, command menu, topbar, dashboard quick actions/tiles, and Coming Soon handling are wired to the access snapshot.
-- Existing integration, agent, memory, creative, automation and business API surfaces still need their own 403 checks before paying customers can be given access.
+- Other feature-specific server actions, MCP tool invocation, OAuth/integration execution, internal worker queues and communication/retail webhook paths still need their own entitlement checks. Do not expose those features to customers until this route-by-route pass is complete.
 - No production build, typecheck, browser acceptance test or end-to-end Stripe test has been run from this GitHub-only editing session. Do not merge/deploy until CI passes and the remaining server-side protections are completed.
