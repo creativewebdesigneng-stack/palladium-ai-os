@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
 
 type Sb = { from: (table: string) => any };
 
@@ -33,7 +33,7 @@ function dto(row: any) {
 }
 
 export const listHtmlStudioDocuments = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("developer_tools")])
   .inputValidator((input: { limit?: number } = {}) => ({ limit: Math.min(Math.max(Number(input.limit ?? 100) || 100, 1), 200) }))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -47,7 +47,7 @@ export const listHtmlStudioDocuments = createServerFn({ method: "POST" })
   });
 
 export const saveHtmlStudioDocument = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("developer_tools")])
   .inputValidator((input: unknown) => docInput.parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -69,7 +69,7 @@ export const saveHtmlStudioDocument = createServerFn({ method: "POST" })
   });
 
 export const createHtmlFromZenNote = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("developer_tools")])
   .inputValidator((input: unknown) => z.object({ noteId: z.string().uuid(), surface: z.enum(surfaces).default("document") }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
