@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Info, Loader2, TriangleAlert } from 'lucide-react';
 import PageHeader from '@/components/palladium/PageHeader';
-import { supabase } from '@/integrations/supabase/client';
+import { useSessionReady } from '@/lib/useSessionReady';
 import { friendlyMessage } from '@/lib/errors';
 import MarketplaceToolbar from '@/components/tool-market/MarketplaceToolbar';
 import PluginCard from '@/components/tool-market/PluginCard';
@@ -17,17 +17,10 @@ function withMarketplaceTimeout(promise, timeoutMs = 15000) {
 }
 
 export default function ToolMarketplace() {
-  const [session, setSession] = useState('unknown');
+  const session = useSessionReady();
   const [category, setCategory] = useState('All');
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(null);
-
-  useEffect(() => {
-    let alive = true;
-    supabase.auth.getSession().then(({ data }) => { if (alive) setSession(data.session ? 'yes' : 'no'); });
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSession(s ? 'yes' : 'no'));
-    return () => { alive = false; sub?.subscription?.unsubscribe(); };
-  }, []);
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['tool-marketplace'],
@@ -101,7 +94,7 @@ export default function ToolMarketplace() {
           <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
             {filtered.map((t) => <PluginCard key={t.slug} tool={t} onOpen={setOpen} />)}
           </div>
-          {filtered.length === 0 && <div className="rounded-2xl border border-dashed border-white/10 p-12 text-center text-sm text-zinc-500">{tools.length === 0 ? 'No tools are currently available to this workspace. Connect or enable an integration to populate the registry.' : 'No tools match your search.'}</div>}
+          {filtered.length === 0 && <div className="rounded-2xl border border-dashed border-white/10 p-12 text-center text-sm text-zinc-500">{tools.length === 0 ? 'No built-in tools are currently available to this workspace. The community plugin marketplace is pre-launch; third-party submissions are not available yet.' : 'No tools match your search.'}</div>}
         </>
       )}
 
