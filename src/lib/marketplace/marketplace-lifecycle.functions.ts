@@ -1,3 +1,4 @@
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import {requestCanonicalPublication} from './marketplace-governance.server';
 import {createServerFn} from '@tanstack/react-start';import {z} from 'zod';import {requireSupabaseAuth} from '@/lib/launch/launch-auth-middleware';type Sb={from:(t:string)=>any};
 const idInput=(v:unknown)=>z.object({listing_id:z.string().uuid()}).parse(v);
