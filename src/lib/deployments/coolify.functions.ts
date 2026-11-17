@@ -1,6 +1,6 @@
 import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
-import { requireLaunchFeatureAuth } from '@/integrations/supabase/auth-middleware';
+import { requireLaunchFeatureAuth } from '@/lib/launch/launch-auth-middleware';
 import { writeAudit,writeAuditRequired } from '@/lib/platform/audit.server';
 import {isPlatformAdmin} from '@/lib/marketplace/marketplace.server';
 import {providerEndpoint,requestProviderJson} from '@/lib/security/provider-http.server';
