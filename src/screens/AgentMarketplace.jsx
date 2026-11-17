@@ -173,7 +173,7 @@ export default function AgentMarketplace() {
             ) : (
               <div className="rounded-2xl border border-dashed border-white/10 bg-white/[.02] px-6 py-14 text-center">
                 <p className="text-sm font-medium text-white">{agents.length === 0 ? 'No published agents yet' : 'No agents match your filters'}</p>
-                <p className="mt-1 text-xs text-zinc-500">{agents.length === 0 ? 'The marketplace shows approved listings only. Draft an agent and submit it through the Creator Hub for review.' : 'Try clearing filters or searching for something else.'}</p>
+                <p className="mt-1 text-xs text-zinc-500">{agents.length === 0 ? 'The community agent marketplace is pre-launch and only shows approved listings. Create a real agent and submit it through the Creator Hub for review; no sample inventory or fake usage counts are shown.' : 'Try clearing filters or searching for something else.'}</p>
                 {agents.length === 0 && <Link to="/creator-hub" className="mt-3 inline-flex rounded-lg border border-violet-300/20 px-3 py-2 text-xs text-violet-200">Open Creator Hub</Link>}
               </div>
             )}
