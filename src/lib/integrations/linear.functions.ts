@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { listLinearTeams, searchLinearIssues } from "./linear.server";
 
 function limit(value: unknown, fallback: number, max: number): number {
