@@ -8,6 +8,8 @@
  */
 import { apiLimitsFor, type ApiPlanLimits } from "./plans";
 import { sha256Hex } from "./keys.server";
+import { getFeatureAccess } from "@/lib/launch/feature-access";
+import type { FeatureId } from "@/lib/launch/feature-registry";
 
 export type ApiCallerContext = {
   userId: string;
@@ -78,7 +80,7 @@ function backendUnavailable() {
 /** Verifies the bearer key and enforces scope + plan quotas. Throws ApiError. */
 export async function authenticateApiRequest(
   request: Request,
-  options: { scope: string; execution?: boolean },
+  options: { scope: string; execution?: boolean; feature?: FeatureId },
 ): Promise<ApiCallerContext> {
   const presented = bearer(request);
   if (!presented) {
@@ -116,6 +118,33 @@ export async function authenticateApiRequest(
         required_scope: options.scope,
       },
     );
+  }
+
+  if (options.feature) {
+    const { data: profile, error: profileError } = await admin
+      .from("profiles").select("email").eq("id", key.user_id).maybeSingle();
+    if (profileError) throw backendUnavailable();
+    const email = typeof profile?.email === "string" ? profile.email : null;
+    const env = process.env as Record<string, string | undefined>;
+    let access = getFeatureAccess(options.feature, { email }, env);
+    if (!access.allowed) {
+      const { data: pilot, error: pilotError } = await admin
+        .from("blackstar_pilot_access")
+        .select("status,beta_features")
+        .eq("user_id", key.user_id)
+        .eq("environment", process.env["STRIPE_MODE"] === "live" ? "live" : "test")
+        .in("status", ["active", "trialing"])
+        .maybeSingle();
+      if (pilotError) throw backendUnavailable();
+      access = getFeatureAccess(options.feature, {
+        email,
+        isPilotCustomer: Boolean(pilot),
+        betaFeatures: Array.isArray(pilot?.beta_features) ? pilot.beta_features : [],
+      }, env);
+    }
+    if (!access.allowed) {
+      throw new ApiError(403, "feature_not_enabled", "This feature is not enabled for this account yet.");
+    }
   }
 
   const planCode = await resolvePlan(admin, key.user_id, key.org_id ?? null);
@@ -240,7 +269,7 @@ async function logRequest(args: {
  * result and records the request in the audit log.
  */
 export function withApiAuth(
-  options: { scope: string; execution?: boolean; path: string },
+  options: { scope: string; execution?: boolean; path: string; feature?: FeatureId },
   handler: (ctx: ApiCallerContext, request: Request, params: any) => Promise<unknown>,
 ) {
   return async ({ request, params }: { request: Request; params?: any }) => {
