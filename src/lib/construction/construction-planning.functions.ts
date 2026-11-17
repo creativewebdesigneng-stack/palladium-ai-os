@@ -1,5 +1,5 @@
 import { createServerFn } from '@tanstack/react-start';
-import { z } from 'zod'; import { requireLaunchFeatureAuth } from '@/integrations/supabase/auth-middleware';
+import { z } from 'zod'; import { requireLaunchFeatureAuth } from '@/lib/launch/launch-auth-middleware';
 type Sb={from:(t:string)=>any};const u=z.string().uuid();const o=z.string().trim().max(8000).optional();
 async function save(sb:Sb,t:string,userId:string,d:any){const{id,...v}=d;const row={...v,updated_at:new Date().toISOString()};const q=id?await sb.from(t).update(row).eq('id',id).eq('user_id',userId).select().single():await sb.from(t).insert({...row,user_id:userId}).select().single();if(q.error)throw new Error(q.error.message);return q.data;}
 const task=z.object({id:u.optional(),workspace_id:u,project_id:u,work_package_id:u.nullish(),name:z.string().trim().min(1).max(220),wbs_code:z.string().max(80).optional(),status:z.enum(['planned','ready','in_progress','blocked','complete','cancelled']).default('planned'),planned_start:z.string().nullish(),planned_finish:z.string().nullish(),duration_days:z.coerce.number().int().min(0).default(1),percent_complete:z.coerce.number().min(0).max(100).default(0),is_milestone:z.boolean().default(false),is_critical:z.boolean().default(false),notes:o});
