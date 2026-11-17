@@ -37,4 +37,21 @@ describe("investor-facing route acceptance manifest", () => {
     expect(existsSync(new URL("../../../public/sitemap.xml", import.meta.url))).toBe(true);
     expect(readFileSync(new URL("../../../public/sitemap.xml", import.meta.url), "utf8")).toContain("<urlset");
   });
+
+  it("keeps the sitemap discoverable from robots.txt", () => {
+    const robots = readFileSync(new URL("../../../public/robots.txt", import.meta.url), "utf8");
+    expect(robots).toContain("Sitemap: https://palladium-ai-os.vercel.app/sitemap.xml");
+  });
+
+  it("does not duplicate route paths across smoke groups", () => {
+    const paths = [
+      ...manifest.signedOutPublic,
+      ...manifest.signedOutRedirects,
+      ...manifest.signedOutAuth,
+      ...manifest.protectedShells,
+      ...manifest.signedOutAssets,
+    ].map((entry) => entry.path);
+    expect(new Set(paths).size).toBe(paths.length);
+  });
+
 });
