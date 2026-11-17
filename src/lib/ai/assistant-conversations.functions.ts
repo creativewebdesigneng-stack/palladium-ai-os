@@ -13,7 +13,7 @@ function titleFromMessage(value: string) {
 }
 
 export const listAssistantConversations = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_chat")])
   .inputValidator((input: unknown) => z.object({
     includeArchived: z.boolean().optional().default(false),
     limit: z.number().int().min(1).max(100).optional().default(30),
@@ -32,7 +32,7 @@ export const listAssistantConversations = createServerFn({ method: 'POST' })
   })
 
 export const createAssistantConversation = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_chat")])
   .inputValidator((input: unknown) => z.object({
     title: z.string().trim().min(1).max(160).optional(),
     seedMessage: z.string().trim().min(1).max(4000).optional(),
@@ -57,7 +57,7 @@ export const createAssistantConversation = createServerFn({ method: 'POST' })
   })
 
 export const getAssistantConversation = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_chat")])
   .inputValidator((input: unknown) => z.object({
     conversationId: idSchema,
     limit: z.number().int().min(1).max(200).optional().default(80),
@@ -84,7 +84,7 @@ export const getAssistantConversation = createServerFn({ method: 'POST' })
   })
 
 export const renameAssistantConversation = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_chat")])
   .inputValidator((input: unknown) => z.object({
     conversationId: idSchema,
     title: z.string().trim().min(1).max(160),
@@ -102,7 +102,7 @@ export const renameAssistantConversation = createServerFn({ method: 'POST' })
   })
 
 export const archiveAssistantConversation = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_chat")])
   .inputValidator((input: unknown) => z.object({
     conversationId: idSchema,
     archived: z.boolean().optional().default(true),
@@ -121,7 +121,7 @@ export const archiveAssistantConversation = createServerFn({ method: 'POST' })
   })
 
 export const deleteAssistantConversation = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_chat")])
   .inputValidator((input: unknown) => z.object({ conversationId: idSchema }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb
