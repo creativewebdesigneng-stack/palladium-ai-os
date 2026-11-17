@@ -6,7 +6,7 @@
  * Nothing here invents sessions, pages or actions.
  */
 import { createServerFn } from "@tanstack/react-start";
-import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { browserProviderStatus } from "@/lib/mission/browser-agent";
 import {
   buildRecordedSessionComputerUsePlan,
