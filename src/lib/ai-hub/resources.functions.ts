@@ -70,7 +70,7 @@ function listModelResources(
 
 /** Tenant-safe live Hub inventory projected from existing authoritative systems. */
 export const listAiHubResources = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_hub")])
   .inputValidator(validateAiHubResourceInput)
   .handler(async ({ data, context }) => {
     const limit = data?.limit ?? 100
