@@ -24,7 +24,7 @@ export default function TemplatePreview({ t, onClose, onUse, onFav, favs }) {
             <span className={`rounded-md px-2 py-0.5 text-[11px] font-medium ${t.price === 'Free' ? 'bg-emerald-400/10 text-emerald-300' : 'bg-violet-400/10 text-violet-300'}`}>{t.price}</span>
           </div>
           <div className="mt-2 flex items-center gap-3 text-[11px] text-zinc-400">
-            <span className="flex items-center gap-0.5 text-amber-300"><Star className="h-3 w-3 fill-amber-300" />{t.rating}</span>
+            {t.rating !== "—" && <span className="flex items-center gap-0.5 text-amber-300"><Star className="h-3 w-3 fill-amber-300" />{t.rating}</span>}
             <span>{t.uses==null?'Usage unavailable':`${t.uses.toLocaleString()} uses`}</span>
           </div>
           <p className="mt-3 text-[13px] leading-relaxed text-zinc-300">{t.desc}</p>
@@ -35,7 +35,7 @@ export default function TemplatePreview({ t, onClose, onUse, onFav, favs }) {
         <div className="grid grid-cols-3 gap-2 border-t border-white/10 p-3">
           <button onClick={() => onFav(t.id)} className={`flex items-center justify-center gap-1 rounded-xl border py-2.5 text-xs ${fav ? 'border-rose-400/20 bg-rose-400/10 text-rose-300' : 'border-white/10 text-zinc-300 hover:bg-white/5'}`}><Heart className={`h-3.5 w-3.5 ${fav ? 'fill-rose-400' : ''}`} />{fav ? 'Saved' : 'Save'}</button>
           <button onClick={() => navigator.clipboard?.writeText(window.location.origin + '/templates#' + t.id)} className="flex items-center justify-center gap-1 rounded-xl border border-white/10 py-2.5 text-xs text-zinc-300 hover:bg-white/5"><Share2 className="h-3.5 w-3.5" />Share</button>
-          <button onClick={() => { onUse(t); onClose(); }} className="flex items-center justify-center gap-1 rounded-xl bg-violet-500 py-2.5 text-xs font-medium text-white hover:bg-violet-600"><ArrowRight className="h-3.5 w-3.5" />Use template</button>
+          <button onClick={() => { onUse(t); onClose(); }} className="flex items-center justify-center gap-1 rounded-xl bg-violet-500 py-2.5 text-xs font-medium text-white hover:bg-violet-600"><ArrowRight className="h-3.5 w-3.5" />Open marketplace</button>
         </div>
       </div>
     </div>
