@@ -395,11 +395,10 @@ export const saveTeam = createServerFn({ method: "POST" })
       name: data.name,
       description: data.description ?? null,
       lead_agent_id: data.leadAgentId ?? null,
-      created_by: context.userId,
     };
     const q = data.id
       ? sb.from("teams").update(payload).eq("id", data.id).eq("org_id", data.orgId)
-      : sb.from("teams").insert(payload);
+      : sb.from("teams").insert({ ...payload, created_by: context.userId });
     const { data: team, error } = await q.select("id,name,description").single();
     if (error) throw new Error(error.message);
 
