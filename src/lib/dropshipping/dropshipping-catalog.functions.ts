@@ -13,7 +13,7 @@ async function safeCapabilities(userId:string,provider:string){
 }
 
 export const getDropshippingCatalogReadCapabilities=createServerFn({method:'POST'})
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("commerce")])
   .inputValidator((value:unknown)=>z.object({provider:z.string().trim().min(1).max(80)}).parse(value))
   .handler(async({data,context})=>{
     const rows=await safeCapabilities(context.userId,data.provider);
@@ -21,7 +21,7 @@ export const getDropshippingCatalogReadCapabilities=createServerFn({method:'POST
   });
 
 export const executeDropshippingCatalogRead=createServerFn({method:'POST'})
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("commerce")])
   .inputValidator((value:unknown)=>inputSchema.parse(value))
   .handler(async({data,context})=>{
     const serialized=JSON.stringify(data.action_input);
