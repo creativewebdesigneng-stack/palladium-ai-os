@@ -1,6 +1,6 @@
 import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
-import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
+import { requireLaunchFeatureAuth } from '@/integrations/supabase/auth-middleware';
 
 type Sb = { from: (table: string) => any; rpc: (name: string, args?: Record<string, unknown>) => any };
 const uuid = z.string().uuid();
@@ -59,7 +59,7 @@ function safeOrderNumber(name: unknown, externalId: unknown) {
 }
 
 export const getRetailCommerceControl = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("commerce")])
   .inputValidator((value: unknown) => z.object({ workspace_id: uuid }).parse(value))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -95,7 +95,7 @@ export const getRetailCommerceControl = createServerFn({ method: 'POST' })
   });
 
 export const syncRetailShopifyOrders = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("commerce")])
   .inputValidator((value: unknown) => z.object({ workspace_id: uuid, limit: z.coerce.number().int().min(1).max(50).default(50) }).parse(value))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -185,7 +185,7 @@ export const syncRetailShopifyOrders = createServerFn({ method: 'POST' })
   });
 
 export const recordRetailPaymentEvent = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("commerce")])
   .inputValidator((value: unknown) => paymentSchema.parse(value))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -206,7 +206,7 @@ export const recordRetailPaymentEvent = createServerFn({ method: 'POST' })
   });
 
 export const reconcileRetailCashSession = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("commerce")])
   .inputValidator((value: unknown) => z.object({
     cash_session_id: uuid,
     counted_cash: z.coerce.number().min(0).max(1_000_000_000),
