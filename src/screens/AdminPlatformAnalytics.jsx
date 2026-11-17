@@ -41,7 +41,7 @@ export default function AdminPlatformAnalytics() {
   const d = q.data;
   const metrics = [
     { label: 'New Users', value: d.new_users.toLocaleString(), change: `over ${d.range.toLowerCase()}`, icon: 'users' },
-    { label: 'Total Requests', value: d.total_requests.toLocaleString(), change: `over ${d.range.toLowerCase()}`, icon: 'git' },
+    { label: 'Platform requests', value: d.total_requests.toLocaleString(), change: `tasks + API calls · ${d.range.toLowerCase()}`, icon: 'git' },
     { label: 'Errors', value: d.total_errors.toLocaleString(), change: `over ${d.range.toLowerCase()}`, icon: 'alert' },
     { label: 'Revenue', value: `£${d.total_revenue.toLocaleString()}`, change: `over ${d.range.toLowerCase()}`, icon: 'dollar' },
   ];
@@ -50,7 +50,7 @@ export default function AdminPlatformAnalytics() {
   return (
     <>
       <PageHeader eyebrow="Admin" title="Platform Analytics" description="Platform-wide telemetry — access is restricted to administrators." action={headerAction} />
-      <div className="mb-4 flex items-start gap-2 rounded-xl border border-rose-400/20 bg-rose-400/[.06] px-3 py-2 text-[11px] text-rose-200/90"><Info className="mt-0.5 h-3.5 w-3.5 shrink-0" /><p>Restricted area. Figures are computed live from agent tasks and API request logs.</p></div>
+      <div className="mb-4 flex items-start gap-2 rounded-xl border border-rose-400/20 bg-rose-400/[.06] px-3 py-2 text-[11px] text-rose-200/90"><Info className="mt-0.5 h-3.5 w-3.5 shrink-0" /><p>Restricted area. Figures are platform-wide. Total requests combines agent tasks and API request logs; it is not the same as agent task runs in an individual workspace.</p></div>
 
       <AnalyticsMetricCards metrics={metrics} />
 
