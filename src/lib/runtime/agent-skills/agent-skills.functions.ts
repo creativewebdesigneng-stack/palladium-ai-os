@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
 import { prepareAgentSkillPackage } from "./skill-package";
 import { compileAgentSkillCapability } from "./capability-compiler";
 import { createPalladiumAiHubRegistry } from "@/lib/ai-hub/registry";
@@ -13,7 +13,7 @@ type SkillFileInput = { path: string; content: string };
 const SAFE_COLUMNS = "id,name,description,version,requires_tools,requires_scripts,dangerous,scan_verdict,scan_findings,source_kind,source_ref,enabled,created_at,updated_at";
 
 export const listAgentSkills = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("agent_runtime")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const { data, error } = await sb.from("agent_skills").select(SAFE_COLUMNS).order("updated_at", { ascending: false });
@@ -22,7 +22,7 @@ export const listAgentSkills = createServerFn({ method: "POST" })
   });
 
 export const getAgentSkill = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("agent_runtime")])
   .inputValidator((input: { id: string }) => input)
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -36,7 +36,7 @@ export const getAgentSkill = createServerFn({ method: "POST" })
   });
 
 export const installAgentSkill = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("agent_runtime")])
   .inputValidator(
     (input: {
       files: SkillFileInput[];
@@ -104,7 +104,7 @@ export const installAgentSkill = createServerFn({ method: "POST" })
   });
 
 export const reflectVerifiedExperienceToSkill = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("agent_runtime")])
   .inputValidator((input: { taskId: string }) => input)
   .handler(async ({ data, context }) => {
     const skill = await createSkillCandidateFromVerifiedExperience({
@@ -116,7 +116,7 @@ export const reflectVerifiedExperienceToSkill = createServerFn({ method: "POST" 
   });
 
 export const setAgentSkillEnabled = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("agent_runtime")])
   .inputValidator((input: { id: string; enabled: boolean }) => input)
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -141,7 +141,7 @@ export const setAgentSkillEnabled = createServerFn({ method: "POST" })
   });
 
 export const deleteAgentSkill = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("agent_runtime")])
   .inputValidator((input: { id: string }) => input)
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -163,7 +163,7 @@ export const deleteAgentSkill = createServerFn({ method: "POST" })
 
 
 export const compileInstalledAgentSkillCapability = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("agent_runtime")])
   .inputValidator((input: { id: string }) => input)
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
