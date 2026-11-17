@@ -37,6 +37,7 @@ export const Route = createFileRoute("/api/agents/run")({
           .select("status,beta_features")
           .eq("user_id", userId)
           .in("status", ["active", "trialing"])
+            .eq("environment", process.env["STRIPE_MODE"] === "live" ? "live" : "test")
           .maybeSingle();
           if (pilotAccessError) return json({ error: "Launch access could not be verified." }, 503);
           access = getFeatureAccess("agent_runtime", {
