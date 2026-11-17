@@ -61,5 +61,6 @@ export default function FileGrid({ onOpen, activeFilter }) {
         )}
       </AnimatePresence>
     </div>
+    </div>
   );
 }
