@@ -5,7 +5,7 @@ import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware'
 const task = z.enum(['text-to-video','image-to-video','text-to-3d','image-to-3d'])
 
 export const discoverStudioHuggingFaceModels = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("creative_studio")])
   .inputValidator((input: unknown) => z.object({
     task,
     limit: z.number().int().min(1).max(24).optional().default(12),
@@ -16,7 +16,7 @@ export const discoverStudioHuggingFaceModels = createServerFn({ method: 'POST' }
   })
 
 export const inspectStudioHuggingFaceModel = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("creative_studio")])
   .inputValidator((input: unknown) => z.object({
     modelId: z.string().trim().min(3).max(240),
   }).parse(input))
