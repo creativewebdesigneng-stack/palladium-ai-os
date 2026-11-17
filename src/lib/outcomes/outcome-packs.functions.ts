@@ -1,6 +1,6 @@
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
-import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware'
+import { requireSupabaseAuth } from '@/lib/launch/launch-auth-middleware'
 import { getEntitlements, recordUsage } from '@/lib/platform/entitlements.server'
 import { writeAudit } from '@/lib/platform/audit.server'
 import { getOutcomePack, OUTCOME_PACKS } from './outcome-packs'
