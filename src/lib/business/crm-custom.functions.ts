@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
 import { writeAudit } from "@/lib/platform/audit.server";
 
 type Sb = { from: (table: string) => any };
@@ -8,7 +8,7 @@ const fieldType = z.enum(["text", "number", "date", "boolean", "select", "multi_
 const jsonRecord = z.record(z.string(), z.unknown());
 
 export const getCrmCustomisation = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("crm")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const [fields, views] = await Promise.all([
@@ -21,7 +21,7 @@ export const getCrmCustomisation = createServerFn({ method: "POST" })
   });
 
 export const saveCrmFieldDefinition = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("crm")])
   .inputValidator((input: unknown) => z.object({
     id: z.string().uuid().optional(),
     key: z.string().trim().regex(/^[a-z][a-z0-9_]{0,62}$/),
@@ -54,7 +54,7 @@ export const saveCrmFieldDefinition = createServerFn({ method: "POST" })
   });
 
 export const deleteCrmFieldDefinition = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("crm")])
   .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -65,7 +65,7 @@ export const deleteCrmFieldDefinition = createServerFn({ method: "POST" })
   });
 
 export const updateCrmContactCustomValues = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("crm")])
   .inputValidator((input: unknown) => z.object({ contactId: z.string().uuid(), values: jsonRecord }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -81,7 +81,7 @@ export const updateCrmContactCustomValues = createServerFn({ method: "POST" })
   });
 
 export const saveCrmView = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("crm")])
   .inputValidator((input: unknown) => z.object({
     id: z.string().uuid().optional(),
     name: z.string().trim().min(1).max(120),
@@ -105,7 +105,7 @@ export const saveCrmView = createServerFn({ method: "POST" })
   });
 
 export const deleteCrmView = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("crm")])
   .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
