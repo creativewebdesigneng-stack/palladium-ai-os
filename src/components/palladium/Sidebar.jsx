@@ -86,7 +86,7 @@ function AdminGroup({ pathname, closeMobile }) {
 }
 
 export default function Sidebar({ collapsed, mobileOpen, closeMobile, openCommand }) {
-  const { user, entitlements } = useAuth()
+  const { entitlements } = useAuth()
   const launchAccess = useLaunchAccess()
   const { pathname } = useLocation()
   const isAdmin = launchAccess.isAdmin
