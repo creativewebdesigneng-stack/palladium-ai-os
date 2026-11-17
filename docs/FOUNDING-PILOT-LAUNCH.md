@@ -39,7 +39,7 @@ Any route not mapped in `route-features.ts` is denied in the application shell u
 
 ## Pilot beta grants
 
-A paid pilot receives the `billing` beta grant by default so the customer can manage their subscription. Other beta features require an explicit per-account grant.
+An active pilot always retains access to billing so they can manage or cancel the subscription that grants pilot access. Other beta features require an explicit per-account grant.
 
 Admin endpoint:
 
