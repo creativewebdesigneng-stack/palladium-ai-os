@@ -1,9 +1,24 @@
 import { describe, expect, it } from "vitest";
 import { existsSync, readFileSync } from "node:fs";
 
+type RouteEntry = {
+  path: string;
+  file: string;
+  marker: string;
+  allowNoindex?: boolean;
+  redirectTo?: string;
+  contentType?: string;
+};
+
 const manifest = JSON.parse(
   readFileSync(new URL("../../../e2e/route-manifest.json", import.meta.url), "utf8"),
-);
+) as {
+  signedOutPublic: RouteEntry[];
+  signedOutRedirects: RouteEntry[];
+  signedOutAuth: RouteEntry[];
+  protectedShells: RouteEntry[];
+  signedOutAssets: RouteEntry[];
+};
 
 describe("investor-facing route acceptance manifest", () => {
   it("tracks the About page as a public, indexable route", () => {
