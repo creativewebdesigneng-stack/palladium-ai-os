@@ -19,10 +19,13 @@ export const Route = createFileRoute("/api/launch/portal")({
         const { data: entitlement, error: readError } = await supabase
           .from("blackstar_pilot_access").select("stripe_customer_id")
           .eq("user_id", userId).in("status", ["active", "trialing"])
+          .eq("environment", process.env["STRIPE_MODE"] === "live" ? "live" : "test")
           .order("updated_at", { ascending: false }).limit(1).maybeSingle();
         if (readError) return json({ error: "Could not verify your billing account." }, 503);
         if (!entitlement?.stripe_customer_id) return json({ error: "No active Founding Pilot subscription was found." }, 404);
         const secret = process.env["STRIPE_SECRET_KEY"];
+        const mode = process.env["STRIPE_MODE"] ?? "test";
+        if (mode === "test" && secret && !secret.startsWith("sk_test_")) return json({ error: "Test deployments must use a Stripe test secret key." }, 503);
         const baseUrl = process.env["APP_BASE_URL"]?.replace(/\/$/, "");
         if (!secret || !baseUrl) return json({ error: "Billing portal is not configured." }, 503);
         try {
