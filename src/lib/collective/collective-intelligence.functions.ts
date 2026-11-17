@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { resolveCollectiveConsensus, type CollectiveProposal } from "./collective-intelligence";
 
 type Sb = { from: (table: string) => any };
