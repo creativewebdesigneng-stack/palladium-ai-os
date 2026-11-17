@@ -11,6 +11,7 @@ import { friendlyMessage } from '@/lib/errors';
 import { getDashboardSummary } from '@/lib/dashboard/dashboard.functions';
 import { markNotifications } from '@/lib/mission/mission.functions';
 import { useAuth } from '@/lib/AuthContext';
+import { useLaunchAccess } from '@/lib/launch/LaunchAccessProvider';
 
 const quick = [
   ['Open intelligence chat', '/chat', MessageSquare],
@@ -35,6 +36,7 @@ function timeAgo(iso) {
 export default function Dashboard() {
   const qc = useQueryClient();
   const { isAuthenticated, isLoadingAuth } = useAuth();
+  const launchAccess = useLaunchAccess();
   const summaryFn = useServerFn(getDashboardSummary);
   const markNotificationsFn = useServerFn(markNotifications);
 
@@ -92,7 +94,7 @@ export default function Dashboard() {
               <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
               Refresh state
             </button>
-            <Link to="/onboarding" className="rounded-xl border border-violet-200/20 bg-violet-300 px-4 py-2 text-sm font-semibold text-[#08070c] shadow-[0_0_30px_rgba(167,139,250,.16)] transition hover:bg-violet-200">Configure Blackstar</Link>
+            {launchAccess.canAccessPath('/onboarding') && <Link to="/onboarding" className="rounded-xl border border-violet-200/20 bg-violet-300 px-4 py-2 text-sm font-semibold text-[#08070c] shadow-[0_0_30px_rgba(167,139,250,.16)] transition hover:bg-violet-200">Configure Blackstar</Link>}
           </div>
         }
       />
@@ -114,7 +116,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      {isAuthenticated && <div className="mt-4"><AssistantPulse enabled={isAuthenticated} /></div>}
+      {isAuthenticated && launchAccess.canAccessPath('/chat') && <div className="mt-4"><AssistantPulse enabled={isAuthenticated} /></div>}
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {loading ? (
@@ -158,7 +160,7 @@ export default function Dashboard() {
         </Panel>
         <Panel title="Command actions" subtitle="Launch common Blackstar operations">
           <div className="grid grid-cols-2 gap-2">
-            {quick.map(([label, path, Icon]) => (
+            {quick.filter(([, path]) => launchAccess.canAccessPath(path)).map(([label, path, Icon]) => (
               <Link key={label} to={path} className="group flex min-h-20 items-start gap-2 rounded-xl border border-violet-300/10 bg-[#0b0910]/60 p-3 text-sm text-zinc-300 transition hover:border-violet-300/25 hover:bg-violet-400/[.045]">
                 <Icon className="mt-0.5 h-4 w-4 shrink-0 text-violet-300" /><span className="leading-5">{label}</span><ArrowRight className="ml-auto mt-0.5 h-3.5 w-3.5 shrink-0 text-zinc-600 transition group-hover:translate-x-0.5 group-hover:text-violet-300" />
               </Link>
@@ -177,7 +179,7 @@ export default function Dashboard() {
             <div className="space-y-4">{activity.map((a) => <div key={a.id} className="flex gap-3"><span className="mt-1.5 h-2 w-2 rounded-full bg-violet-300 ring-4 ring-violet-400/10" /><div className="min-w-0"><p className="break-words text-sm text-zinc-300">{a.message}</p><p className="mt-1 text-[10px] uppercase tracking-[.12em] text-zinc-600">{timeAgo(a.created_at)}</p></div></div>)}</div>
           )}
         </Panel>
-        <Panel title="Agent network" subtitle="Recently active intelligence workers">
+        {launchAccess.canAccessPath('/agent-runtime') && <Panel title="Agent network" subtitle="Recently active intelligence workers">
           {loading ? (
             <div className="space-y-2">{Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-9 animate-pulse rounded-lg bg-white/[.035]" />)}</div>
           ) : recentAgents.length === 0 ? (
@@ -185,8 +187,8 @@ export default function Dashboard() {
           ) : (
             <div className="space-y-2">{recentAgents.map((a) => <Link key={a.id} to={`/agents/${a.id}`} className="flex items-center gap-2 rounded-lg border border-violet-300/10 bg-[#0b0910]/50 p-2.5 text-sm text-zinc-300 transition hover:border-violet-300/20 hover:bg-violet-400/[.035]"><Bot className="h-4 w-4 text-violet-300" /><span className="truncate">{a.name}</span><span className="ml-auto text-[9px] uppercase tracking-[.12em] text-zinc-600">{a.status}</span></Link>)}</div>
           )}
-        </Panel>
-        <Panel title="Execution queue" subtitle="Recently created and running tasks">
+        </Panel>}
+        {launchAccess.canAccessPath('/projects') && <Panel title="Execution queue" subtitle="Recently created and running tasks">
           {loading ? (
             <div className="space-y-2">{Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-9 animate-pulse rounded-lg bg-white/[.035]" />)}</div>
           ) : recentTasks.length === 0 ? (
@@ -194,7 +196,7 @@ export default function Dashboard() {
           ) : (
             <div className="space-y-2">{recentTasks.map((t) => <Link key={t.id} to="/tasks" className="flex items-center gap-2 rounded-lg border border-violet-300/10 bg-[#0b0910]/50 p-2.5 text-sm text-zinc-300 transition hover:border-violet-300/20 hover:bg-violet-400/[.035]"><ListChecks className="h-4 w-4 text-violet-300" /><span className="truncate">{t.title}</span><span className="ml-auto text-[9px] uppercase tracking-[.12em] text-zinc-600">{t.status}</span></Link>)}</div>
           )}
-        </Panel>
+        </Panel>}
       </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
@@ -211,9 +213,9 @@ export default function Dashboard() {
               <div className="mt-3 h-2 overflow-hidden rounded-full border border-violet-300/10 bg-black/40"><div className="h-full rounded-full bg-gradient-to-r from-violet-800 via-violet-500 to-violet-300 shadow-[0_0_20px_rgba(139,92,246,.22)]" style={{ width: `${Math.min(100, (credits.used / Math.max(1, credits.limit)) * 100)}%` }} /></div>
             </>
           )}
-          <Link to="/billing" className="mt-3 flex items-center gap-1 text-xs text-violet-300">Manage capacity <ArrowRight className="h-3 w-3" /></Link>
+          {launchAccess.canAccessPath('/billing') && <Link to="/billing" className="mt-3 flex items-center gap-1 text-xs text-violet-300">Manage capacity <ArrowRight className="h-3 w-3" /></Link>}
         </Panel>
-        <Panel title="Attention queue" subtitle="Notifications requiring awareness or action">
+        {launchAccess.canAccessPath('/notifications') && <Panel title="Attention queue" subtitle="Notifications requiring awareness or action">
           {loading ? (
             <div className="space-y-2">{Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-9 animate-pulse rounded-lg bg-white/[.035]" />)}</div>
           ) : notifications.length === 0 ? (
@@ -233,7 +235,7 @@ export default function Dashboard() {
             ))}</div>
           )}
           <Link to="/notifications" className="mt-3 flex items-center gap-1 text-xs text-violet-300">Open attention queue <ArrowRight className="h-3 w-3" /></Link>
-        </Panel>
+        </Panel>}
       </div>
     </div>
   );
