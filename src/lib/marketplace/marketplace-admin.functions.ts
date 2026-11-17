@@ -1,3 +1,4 @@
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import {decideCanonicalModeration} from './marketplace-governance.server';
 import {createServerFn} from '@tanstack/react-start';import {z} from 'zod';import {requireSupabaseAuth} from '@/lib/launch/launch-auth-middleware';import {marketplaceStripe} from './stripe.server';type Sb={from:(t:string)=>any;rpc:(fn:string,args?:Record<string,unknown>)=>any};
 async function admin(sb:Sb,userId:string){const {data,error}=await sb.from('marketplace_admins').select('user_id').eq('user_id',userId).maybeSingle();if(error||!data)throw new Error('Marketplace administrator access required.')}
