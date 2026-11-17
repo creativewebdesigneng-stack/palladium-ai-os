@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { searchPublicWeb } from "@/lib/ai/web-access.server";
 import { recordUsage } from "@/lib/platform/entitlements.server";
 import { writeAudit } from "@/lib/platform/audit.server";
