@@ -122,7 +122,8 @@ export function requireLaunchFeatureAuth(featureId: FeatureId) {
       let access = getFeatureAccess(featureId, { email }, env);
 
       if (!access.allowed) {
-        const { data: pilot, error } = await context.supabase
+        const sb = context.supabase as unknown as { from: (table: string) => any };
+        const { data: pilot, error } = await sb
           .from("blackstar_pilot_access")
           .select("status,beta_features")
           .eq("user_id", context.userId)
