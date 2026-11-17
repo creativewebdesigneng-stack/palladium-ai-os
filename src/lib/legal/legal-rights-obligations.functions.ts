@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
 
 type Sb = { from: (table: string) => any };
 
@@ -30,7 +30,7 @@ const schema = z.object({
 });
 
 export const listLegalRightsObligations = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("security")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const { data, error } = await sb
@@ -44,7 +44,7 @@ export const listLegalRightsObligations = createServerFn({ method: "POST" })
   });
 
 export const saveLegalRightsObligation = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("security")])
   .inputValidator((value: unknown) => schema.parse(value))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -87,7 +87,7 @@ export const saveLegalRightsObligation = createServerFn({ method: "POST" })
   });
 
 export const deleteLegalRightsObligation = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("security")])
   .inputValidator((value: unknown) => z.object({ id: z.string().uuid() }).parse(value))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
