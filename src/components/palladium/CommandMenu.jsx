@@ -38,7 +38,6 @@ function match(item, q) {
 export default function CommandMenu({ open, onClose }) {
   const navigate = useNavigate()
   const searchFn = useServerFn(searchWorkspace)
-  const { user } = useAuth()
   const launchAccess = useLaunchAccess()
   const [query, setQuery] = useState('')
   const [selected, setSelected] = useState(0)
