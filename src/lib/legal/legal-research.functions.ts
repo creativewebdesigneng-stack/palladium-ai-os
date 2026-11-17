@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { searchPublicWeb, type WebSource } from "@/lib/ai/web-access.server";
 import { runChat } from "@/lib/runtime/model-gateway.server";
 import { resolveAssistantModelPreference } from "@/lib/ai/ai-preferences.server";
