@@ -1,6 +1,6 @@
 import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
-import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
+import { requireLaunchFeatureAuth } from '@/integrations/supabase/auth-middleware';
 import { writeAudit } from '@/lib/platform/audit.server';
 import { getGenerativeMediaCapabilities, getGenerativeMediaJob, submitGenerativeMediaJob } from './generative-media.server';
 
@@ -8,7 +8,7 @@ type Sb = { from: (table: string) => any };
 const provider = z.enum(['seedream', 'ltx']);
 
 export const getGenerativeMediaOverview = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("creative_studio")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const { data, error } = await sb
@@ -23,7 +23,7 @@ export const getGenerativeMediaOverview = createServerFn({ method: 'POST' })
   });
 
 export const createGenerativeMediaJob = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("creative_studio")])
   .inputValidator((input: unknown) => z.object({
     provider,
     prompt: z.string().trim().min(1).max(12_000),
@@ -86,7 +86,7 @@ export const createGenerativeMediaJob = createServerFn({ method: 'POST' })
   });
 
 export const refreshGenerativeMediaJob = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("creative_studio")])
   .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
