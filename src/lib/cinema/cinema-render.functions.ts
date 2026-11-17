@@ -70,7 +70,7 @@ async function createMediaJob(sb:Sb,userId:string,input:{
   }
 }
 
-export const getCinemaRenderOverview=createServerFn({method:'POST'}).middleware([requireSupabaseAuth])
+export const getCinemaRenderOverview=createServerFn({method:'POST'}).middleware([requireLaunchFeatureAuth("cinema_studio")])
   .inputValidator((v:unknown)=>z.object({projectId:z.string().uuid()}).parse(v))
   .handler(async({data,context})=>{
     const sb=context.supabase as unknown as Sb
@@ -82,7 +82,7 @@ export const getCinemaRenderOverview=createServerFn({method:'POST'}).middleware(
     return {capabilities:getGenerativeMediaCapabilities(),renders:result.data??[]}
   })
 
-export const submitCinemaSceneKeyframes=createServerFn({method:'POST'}).middleware([requireSupabaseAuth])
+export const submitCinemaSceneKeyframes=createServerFn({method:'POST'}).middleware([requireLaunchFeatureAuth("cinema_studio")])
   .inputValidator((v:unknown)=>z.object({projectId:z.string().uuid(),sceneId:z.string().trim().min(1).max(60),limit:z.number().int().min(1).max(8).default(6)}).parse(v))
   .handler(async({data,context})=>{
     const sb=context.supabase as unknown as Sb
@@ -141,7 +141,7 @@ export const submitCinemaSceneKeyframes=createServerFn({method:'POST'}).middlewa
     return {projectId:data.projectId,sceneId:data.sceneId,results}
   })
 
-export const submitCinemaSceneVideoSegments=createServerFn({method:'POST'}).middleware([requireSupabaseAuth])
+export const submitCinemaSceneVideoSegments=createServerFn({method:'POST'}).middleware([requireLaunchFeatureAuth("cinema_studio")])
   .inputValidator((v:unknown)=>z.object({projectId:z.string().uuid(),sceneId:z.string().trim().min(1).max(60),limitShots:z.number().int().min(1).max(6).default(3)}).parse(v))
   .handler(async({data,context})=>{
     const sb=context.supabase as unknown as Sb
@@ -209,7 +209,7 @@ export const submitCinemaSceneVideoSegments=createServerFn({method:'POST'}).midd
     return {projectId:data.projectId,sceneId:data.sceneId,results}
   })
 
-export const refreshCinemaShotRender=createServerFn({method:'POST'}).middleware([requireSupabaseAuth])
+export const refreshCinemaShotRender=createServerFn({method:'POST'}).middleware([requireLaunchFeatureAuth("cinema_studio")])
   .inputValidator((v:unknown)=>z.object({id:z.string().uuid()}).parse(v))
   .handler(async({data,context})=>{
     const sb=context.supabase as unknown as Sb
