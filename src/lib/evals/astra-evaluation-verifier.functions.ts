@@ -1,6 +1,6 @@
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
-import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware'
+import { requireSupabaseAuth } from '@/lib/launch/launch-auth-middleware'
 import { writeAudit } from '@/lib/platform/audit.server'
 
 const taskClassSchema = z.enum(['general', 'reasoning', 'coding', 'tool_use', 'vision', 'agentic'])
