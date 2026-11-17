@@ -12,7 +12,7 @@ const INPUT=z.object({lens:z.enum(['all','short_term','long_term','organisation'
  * Status is derived from real Supabase rows, not simulated sidecar health.
  */
 export const getMemoryArchive = createServerFn({method:'POST'})
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("memory")])
   .inputValidator((input:unknown)=>INPUT.parse(input??{}))
   .handler(async ({data,context})=>{
     const sb=context.supabase as unknown as Sb
