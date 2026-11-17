@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
-import { requireLaunchFeatureAuth } from '@/integrations/supabase/auth-middleware';
+import { requireLaunchFeatureAuth } from '@/lib/launch/launch-auth-middleware';
 import { assessWebsiteQuality } from '@/lib/website-studio/website-quality';
 import { assessPublishReadiness } from '@/lib/website-studio/website-publish';
 import { writeAudit } from '@/lib/platform/audit.server';
