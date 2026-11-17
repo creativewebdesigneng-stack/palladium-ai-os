@@ -23,7 +23,7 @@ export const Route = createFileRoute("/api/launch/webhook")({
         }
         const configuredMode = process.env["STRIPE_MODE"] ?? "test";
         if (configuredMode !== "test" && configuredMode !== "live") return Response.json({ error: "Invalid Stripe mode." }, { status: 503 });
-        if (configuredMode === "test" && !secretKey.startsWith("sk_test_")) return Response.json({ error: "Test deployments must use a Stripe test secret key." }, { status: 503 });
+        if (!secretKey.startsWith(configuredMode === "test" ? "sk_test_" : "sk_live_")) return Response.json({ error: `STRIPE_SECRET_KEY must match STRIPE_MODE=${configuredMode}.` }, { status: 503 });
         if (event.livemode !== (configuredMode === "live")) return Response.json({ error: "Stripe event mode does not match this deployment." }, { status: 400 });
         const { supabaseAdmin: db } = await import("@/integrations/supabase/client.server");
         try {
