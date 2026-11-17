@@ -1,6 +1,6 @@
 import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
-import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
+import { requireLaunchFeatureAuth } from '@/integrations/supabase/auth-middleware';
 import { writeAudit, writeAuditRequired } from '@/lib/platform/audit.server';
 import { getAutoEditorJob, getMediaRuntimeCapabilities, submitAutoEditorJob } from '@/lib/media/media-runtime.server';
 
@@ -8,7 +8,7 @@ type Sb = { from: (table: string) => any };
 const outputFormat = z.enum(['mp4','mov','premiere','resolve','final-cut-pro','shotcut','kdenlive','clip-sequence']);
 
 export const getMediaStudioOverview = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("creative_studio")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const { data, error } = await sb.from('media_edit_jobs')
@@ -21,7 +21,7 @@ export const getMediaStudioOverview = createServerFn({ method: 'POST' })
   });
 
 export const createMediaEditJob = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("creative_studio")])
   .inputValidator((input: unknown) => z.object({
     inputName: z.string().trim().min(1).max(240),
     sourceUrl: z.string().url().max(4000),
@@ -62,7 +62,7 @@ export const createMediaEditJob = createServerFn({ method: 'POST' })
   });
 
 export const refreshMediaEditJob = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("creative_studio")])
   .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
