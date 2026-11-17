@@ -22,7 +22,7 @@ export function isLaunchAdmin(
   actor: LaunchActor,
   env: Record<string, string | undefined> = {},
 ): boolean {
-  const configured = env.BLACKSTAR_ADMIN_EMAIL?.trim().toLowerCase();
+  const configured = env["BLACKSTAR_ADMIN_EMAIL"]?.trim().toLowerCase();
   return Boolean(configured && actor.email?.trim().toLowerCase() === configured);
 }
 
