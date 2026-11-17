@@ -85,7 +85,7 @@ async function addSafeCredentialFingerprint<T extends { code: string; message: s
 }
 
 export const getAstraCertificationBenchmark = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_models")])
   .inputValidator((input: unknown) => z.object({
     orgId: z.string().uuid().nullish(),
     taskClass: taskClassSchema,
@@ -103,7 +103,7 @@ export const getAstraCertificationBenchmark = createServerFn({ method: 'POST' })
   })
 
 export const runAstraTextCertificationCase = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_models")])
   .inputValidator((input: unknown) => z.object({
     orgId: z.string().uuid().nullish(),
     taskClass: textTaskClassSchema,
@@ -159,7 +159,7 @@ export const runAstraTextCertificationCase = createServerFn({ method: 'POST' })
   })
 
 export const runAstraVisionCertificationCase = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_models")])
   .inputValidator((input: unknown) => z.object({
     orgId: z.string().uuid().nullish(),
     caseId: z.string().trim().min(1).max(120),
@@ -178,7 +178,7 @@ export const runAstraVisionCertificationCase = createServerFn({ method: 'POST' }
   })
 
 export const attestAstraCertificationRun = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_models")])
   .inputValidator((input: unknown) => z.object({
     orgId: z.string().uuid().nullish(),
     taskClass: taskClassSchema,
