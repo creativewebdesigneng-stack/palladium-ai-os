@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { searchHubSpotContacts, searchHubSpotDeals } from "./hubspot.server";
 
 function searchInput(input: { query: string; limit?: number }) {
