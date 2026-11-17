@@ -73,7 +73,7 @@ function normalizePolicy(policy: z.infer<typeof policySchema> | undefined): Coun
  * execute through the existing AI Hub / Agent Runtime approval boundary.
  */
 export const planBlackstarCounterfactualDecision = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_hub")])
   .inputValidator(validateCounterfactualRequest)
   .handler(async ({ data }) => {
     const scenarios = data.scenarios.map(normalizeScenario)
