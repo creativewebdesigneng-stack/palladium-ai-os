@@ -3,7 +3,7 @@
  * personal identity and optional live-web grounding for time-sensitive questions.
  */
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
 import {
   assertWithinLimit,
   EntitlementError,
@@ -124,7 +124,7 @@ async function runAssistantWithFallback(args: {
 }
 
 export const assistantChat = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_chat")])
   .inputValidator((input: { message: string; history?: Turn[]; location?: unknown; conversationId?: string | null; pathname?: unknown }) => {
     const message = String(input?.message ?? "").trim();
     if (!message) throw new Error("A message is required.");
