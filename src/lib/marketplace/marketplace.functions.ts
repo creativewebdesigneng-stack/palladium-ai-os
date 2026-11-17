@@ -1,3 +1,4 @@
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 /** Legacy agent-catalogue RPCs backed by the canonical marketplace and its governance. */
 import {createServerFn} from '@tanstack/react-start';
 import {z} from 'zod';
