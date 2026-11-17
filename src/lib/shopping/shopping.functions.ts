@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
 import { writeAudit } from "@/lib/platform/audit.server";
 import { prepareCheckoutDraft, runShoppingResearch } from "@/lib/mission/mission.server";
 import { browserProviderStatus } from "@/lib/mission/browser-agent";
@@ -69,7 +69,7 @@ async function allowlistFor(sb: Sb, userId: string, agentId?: string | null) {
 /* ------------------------------------------------------------------ workspace */
 
 export const getShoppingWorkspace = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("commerce")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const userId = context.userId;
@@ -134,7 +134,7 @@ export const runShoppingSearch = createServerFn({ method: "POST" })
     if (!input?.requirement?.trim()) throw new Error("Describe what you are looking for");
     return input;
   })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("commerce")])
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
     const userId = context.userId;
@@ -235,7 +235,7 @@ export const runShoppingSearch = createServerFn({ method: "POST" })
 /** Re-ranks stored offers and returns cheapest / best-rated / fastest views. */
 export const compareResults = createServerFn({ method: "POST" })
   .inputValidator((input: { taskId: string }) => input)
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("commerce")])
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
     const userId = context.userId;
@@ -293,7 +293,7 @@ export const preparePurchase = createServerFn({ method: "POST" })
   .inputValidator(
     (input: { resultId: string; quantity?: number; agentId?: string | null }) => input,
   )
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("commerce")])
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
     const userId = context.userId;
@@ -456,7 +456,7 @@ export const preparePurchase = createServerFn({ method: "POST" })
 /** Read-only affordability preview shown before a purchase is prepared. */
 export const previewPurchaseLimits = createServerFn({ method: "POST" })
   .inputValidator((input: { total: number; agentId?: string | null; currency?: string }) => input)
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("commerce")])
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
     const limits = await resolveSpendLimits(sb, context.userId, data.agentId ?? null);
@@ -474,7 +474,7 @@ export const saveSpendLimits = createServerFn({ method: "POST" })
       monthlyCap?: number | null;
     }) => input,
   )
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("commerce")])
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
     const userId = context.userId;
@@ -550,7 +550,7 @@ export const trackProduct = createServerFn({ method: "POST" })
       status?: string;
     }) => input,
   )
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("commerce")])
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
     const userId = context.userId;
@@ -619,7 +619,7 @@ export const trackProduct = createServerFn({ method: "POST" })
 /** Re-checks a tracked product through the browser agent and records the price. */
 export const refreshWatch = createServerFn({ method: "POST" })
   .inputValidator((input: { id: string }) => input)
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("commerce")])
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
     const userId = context.userId;
@@ -686,7 +686,7 @@ export const refreshWatch = createServerFn({ method: "POST" })
 
 export const deleteWatch = createServerFn({ method: "POST" })
   .inputValidator((input: { id: string }) => input)
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("commerce")])
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
     await sb.from("product_watches").delete().eq("id", data.id).eq("user_id", context.userId);
@@ -713,7 +713,7 @@ export const saveShoppingList = createServerFn({ method: "POST" })
       return input;
     },
   )
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("commerce")])
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
     const userId = context.userId;
@@ -739,7 +739,7 @@ export const saveShoppingList = createServerFn({ method: "POST" })
 
 export const deleteShoppingList = createServerFn({ method: "POST" })
   .inputValidator((input: { id: string }) => input)
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("commerce")])
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
     await sb.from("shopping_lists").delete().eq("id", data.id).eq("user_id", context.userId);
@@ -762,7 +762,7 @@ export const saveListItem = createServerFn({ method: "POST" })
       return input;
     },
   )
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("commerce")])
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
     const userId = context.userId;
@@ -799,7 +799,7 @@ export const saveListItem = createServerFn({ method: "POST" })
 
 export const deleteListItem = createServerFn({ method: "POST" })
   .inputValidator((input: { id: string }) => input)
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("commerce")])
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
     await sb.from("shopping_list_items").delete().eq("id", data.id).eq("user_id", context.userId);
