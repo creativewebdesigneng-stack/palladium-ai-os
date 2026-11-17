@@ -30,9 +30,10 @@ describe("Blackstar launch feature access", () => {
 
   it("requires both pilot entitlement and per-account beta enablement", () => {
     const pilot = { email: "pilot@example.com", isPilotCustomer: true };
-    const betaEnv = { ...env, BLACKSTAR_FEATURE_BILLING: "beta" };
-    expect(getFeatureAccess("billing", pilot, betaEnv).reason).toBe("beta_not_enabled");
-    expect(getFeatureAccess("billing", { ...pilot, betaFeatures: ["billing"] }, betaEnv).allowed).toBe(true);
+    const betaEnv = { ...env, BLACKSTAR_FEATURE_AGENT_RUNTIME: "beta" };
+    expect(getFeatureAccess("agent_runtime", pilot, betaEnv).reason).toBe("beta_not_enabled");
+    expect(getFeatureAccess("agent_runtime", { ...pilot, betaFeatures: ["agent_runtime"] }, betaEnv).allowed).toBe(true);
+    expect(getFeatureAccess("billing", pilot, env).allowed).toBe(true);
   });
 
   it("returns only features allowed to the actor", () => {
