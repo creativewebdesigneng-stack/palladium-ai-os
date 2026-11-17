@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
 
 type Sb = { from: (table: string) => any };
 
@@ -24,7 +24,7 @@ async function assertOwnedAgent(sb: Sb, userId: string, agentId: string | null |
 }
 
 export const getPersonalOsProfile = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("projects")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const { data: profile, error } = await sb.from("personal_os_profiles").select("*").eq("user_id", context.userId).maybeSingle();
@@ -33,7 +33,7 @@ export const getPersonalOsProfile = createServerFn({ method: "GET" })
   });
 
 export const savePersonalOsProfile = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("projects")])
   .inputValidator((input: unknown) => profileInput.parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
