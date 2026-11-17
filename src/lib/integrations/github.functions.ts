@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
 
 type Sb = { from: (table: string) => any };
 
@@ -86,7 +86,7 @@ async function githubConnection(sb: Sb, userId: string): Promise<{ installationI
 }
 
 export const getGitHubConnection = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("integrations")])
   .handler(async ({ context }) => {
     const { githubConnectionConfigured } = await import("./github-app.server");
     const sb = context.supabase as unknown as Sb;
@@ -113,7 +113,7 @@ export const getGitHubConnection = createServerFn({ method: "POST" })
 
 /** Starts GitHub user authorization first so existing App installations can be discovered reliably. */
 export const startGitHubConnection = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("integrations")])
   .inputValidator((input: unknown) => startInput.parse(input))
   .handler(async ({ data, context }) => {
     const { safeOrigin, createState } = await import("./oauth.server");
@@ -150,7 +150,7 @@ export const startGitHubConnection = createServerFn({ method: "POST" })
   });
 
 export const listConnectedGitHubRepositories = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("integrations")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const connection = await githubConnection(sb, context.userId);
@@ -162,7 +162,7 @@ export const listConnectedGitHubRepositories = createServerFn({ method: "POST" }
   });
 
 export const listConnectedGitHubBranches = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("integrations")])
   .inputValidator((input: unknown) => branchesInput.parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -178,7 +178,7 @@ export const listConnectedGitHubBranches = createServerFn({ method: "POST" })
   });
 
 export const listConnectedGitHubCommits = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("integrations")])
   .inputValidator((input: unknown) => commitsInput.parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -195,7 +195,7 @@ export const listConnectedGitHubCommits = createServerFn({ method: "POST" })
   });
 
 export const listConnectedGitHubPath = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("integrations")])
   .inputValidator((input: unknown) => pathInput.parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -212,7 +212,7 @@ export const listConnectedGitHubPath = createServerFn({ method: "POST" })
   });
 
 export const readConnectedGitHubFile = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("integrations")])
   .inputValidator((input: unknown) => fileInput.parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
