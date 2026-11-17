@@ -1,6 +1,6 @@
 /** Authenticated Palladium Orchestrator API. */
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
 import { orchestrateGoal, OrchestratorError } from "./orchestrator.server";
 
 type Sb = { from: (table: string) => any };
@@ -16,7 +16,7 @@ function surface(error: unknown): never {
  * Caller identity and all accessible-agent/workforce checks are server-side.
  */
 export const runOrchestrator = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("agent_runtime")])
   .inputValidator(
     (input: { goal: string; workforce_id?: string | null; org_id?: string | null }) => ({
       goal: String(input?.goal ?? "").trim(),
