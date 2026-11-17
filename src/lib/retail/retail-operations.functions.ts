@@ -1,6 +1,6 @@
 import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
-import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
+import { requireLaunchFeatureAuth } from '@/integrations/supabase/auth-middleware';
 
 type Sb = { from: (table: string) => any; rpc: (name: string, args?: Record<string, unknown>) => any };
 
@@ -98,7 +98,7 @@ async function saveOwned(sb: Sb, table: string, userId: string, data: Record<str
 }
 
 export const listRetailWorkspaces = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("commerce")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const { data, error } = await sb.from('retail_workspaces').select('*').order('updated_at', { ascending: false });
@@ -107,7 +107,7 @@ export const listRetailWorkspaces = createServerFn({ method: 'POST' })
   });
 
 export const getRetailOperations = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("commerce")])
   .inputValidator((value: unknown) => z.object({ workspace_id: uuid }).parse(value))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -147,18 +147,18 @@ export const getRetailOperations = createServerFn({ method: 'POST' })
     };
   });
 
-export const saveRetailWorkspace = createServerFn({ method: 'POST' }).middleware([requireSupabaseAuth]).inputValidator((v: unknown) => workspaceSchema.parse(v)).handler(async ({ data, context }) => saveOwned(context.supabase as unknown as Sb, 'retail_workspaces', context.userId, data));
-export const saveRetailLocation = createServerFn({ method: 'POST' }).middleware([requireSupabaseAuth]).inputValidator((v: unknown) => locationSchema.parse(v)).handler(async ({ data, context }) => saveOwned(context.supabase as unknown as Sb, 'retail_locations', context.userId, data));
-export const saveRetailSupplier = createServerFn({ method: 'POST' }).middleware([requireSupabaseAuth]).inputValidator((v: unknown) => supplierSchema.parse(v)).handler(async ({ data, context }) => saveOwned(context.supabase as unknown as Sb, 'retail_suppliers', context.userId, data));
-export const saveRetailCatalogItem = createServerFn({ method: 'POST' }).middleware([requireSupabaseAuth]).inputValidator((v: unknown) => catalogSchema.parse(v)).handler(async ({ data, context }) => saveOwned(context.supabase as unknown as Sb, 'retail_catalog_items', context.userId, data));
-export const saveRetailPurchaseOrder = createServerFn({ method: 'POST' }).middleware([requireSupabaseAuth]).inputValidator((v: unknown) => purchaseOrderSchema.parse(v)).handler(async ({ data, context }) => saveOwned(context.supabase as unknown as Sb, 'retail_purchase_orders', context.userId, data));
-export const saveRetailStaff = createServerFn({ method: 'POST' }).middleware([requireSupabaseAuth]).inputValidator((v: unknown) => staffSchema.parse(v)).handler(async ({ data, context }) => saveOwned(context.supabase as unknown as Sb, 'retail_staff', context.userId, data));
-export const saveRetailAppointment = createServerFn({ method: 'POST' }).middleware([requireSupabaseAuth]).inputValidator((v: unknown) => appointmentSchema.parse(v)).handler(async ({ data, context }) => saveOwned(context.supabase as unknown as Sb, 'retail_appointments', context.userId, data));
-export const saveRetailOrder = createServerFn({ method: 'POST' }).middleware([requireSupabaseAuth]).inputValidator((v: unknown) => orderSchema.parse(v)).handler(async ({ data, context }) => saveOwned(context.supabase as unknown as Sb, 'retail_orders', context.userId, data));
-export const saveRetailCall = createServerFn({ method: 'POST' }).middleware([requireSupabaseAuth]).inputValidator((v: unknown) => callSchema.parse(v)).handler(async ({ data, context }) => saveOwned(context.supabase as unknown as Sb, 'retail_call_inbox', context.userId, data));
+export const saveRetailWorkspace = createServerFn({ method: 'POST' }).middleware([requireLaunchFeatureAuth("commerce")]).inputValidator((v: unknown) => workspaceSchema.parse(v)).handler(async ({ data, context }) => saveOwned(context.supabase as unknown as Sb, 'retail_workspaces', context.userId, data));
+export const saveRetailLocation = createServerFn({ method: 'POST' }).middleware([requireLaunchFeatureAuth("commerce")]).inputValidator((v: unknown) => locationSchema.parse(v)).handler(async ({ data, context }) => saveOwned(context.supabase as unknown as Sb, 'retail_locations', context.userId, data));
+export const saveRetailSupplier = createServerFn({ method: 'POST' }).middleware([requireLaunchFeatureAuth("commerce")]).inputValidator((v: unknown) => supplierSchema.parse(v)).handler(async ({ data, context }) => saveOwned(context.supabase as unknown as Sb, 'retail_suppliers', context.userId, data));
+export const saveRetailCatalogItem = createServerFn({ method: 'POST' }).middleware([requireLaunchFeatureAuth("commerce")]).inputValidator((v: unknown) => catalogSchema.parse(v)).handler(async ({ data, context }) => saveOwned(context.supabase as unknown as Sb, 'retail_catalog_items', context.userId, data));
+export const saveRetailPurchaseOrder = createServerFn({ method: 'POST' }).middleware([requireLaunchFeatureAuth("commerce")]).inputValidator((v: unknown) => purchaseOrderSchema.parse(v)).handler(async ({ data, context }) => saveOwned(context.supabase as unknown as Sb, 'retail_purchase_orders', context.userId, data));
+export const saveRetailStaff = createServerFn({ method: 'POST' }).middleware([requireLaunchFeatureAuth("commerce")]).inputValidator((v: unknown) => staffSchema.parse(v)).handler(async ({ data, context }) => saveOwned(context.supabase as unknown as Sb, 'retail_staff', context.userId, data));
+export const saveRetailAppointment = createServerFn({ method: 'POST' }).middleware([requireLaunchFeatureAuth("commerce")]).inputValidator((v: unknown) => appointmentSchema.parse(v)).handler(async ({ data, context }) => saveOwned(context.supabase as unknown as Sb, 'retail_appointments', context.userId, data));
+export const saveRetailOrder = createServerFn({ method: 'POST' }).middleware([requireLaunchFeatureAuth("commerce")]).inputValidator((v: unknown) => orderSchema.parse(v)).handler(async ({ data, context }) => saveOwned(context.supabase as unknown as Sb, 'retail_orders', context.userId, data));
+export const saveRetailCall = createServerFn({ method: 'POST' }).middleware([requireLaunchFeatureAuth("commerce")]).inputValidator((v: unknown) => callSchema.parse(v)).handler(async ({ data, context }) => saveOwned(context.supabase as unknown as Sb, 'retail_call_inbox', context.userId, data));
 
 export const adjustRetailInventory = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("commerce")])
   .inputValidator((value: unknown) => z.object({
     workspace_id: uuid, item_id: uuid, location_id: uuid.nullish(), quantity: z.coerce.number().min(-1_000_000_000).max(1_000_000_000).refine((n) => n !== 0, 'Quantity cannot be zero'),
     movement_type: z.enum(['stock_in','sale','return','adjustment','waste','transfer_in','transfer_out','reservation','release']), note: text(2000), reference_type: text(120), reference_id: text(240),
