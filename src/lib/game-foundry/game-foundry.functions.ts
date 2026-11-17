@@ -4,7 +4,7 @@ import { assessGtaVehicleInspection } from "./gta-vehicle-inspection";
 import { gtaVehicleInspectorConfigured, requestGtaVehicleInspection } from "./gta-vehicle-inspector.server";
 import { z } from "zod";
 import { open3dHealth } from "./game-foundry-open3d.server";
-import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { writeAudit } from "@/lib/platform/audit.server";
 import { resolveAssistantModelPreference } from "@/lib/ai/ai-preferences.server";
 import { ProviderError } from "@/lib/runtime/model-gateway.server";
