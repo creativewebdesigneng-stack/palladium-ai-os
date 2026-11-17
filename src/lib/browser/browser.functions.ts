@@ -6,7 +6,7 @@
  * Nothing here invents sessions, pages or actions.
  */
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
 import { browserProviderStatus } from "@/lib/mission/browser-agent";
 import {
   buildRecordedSessionComputerUsePlan,
@@ -19,7 +19,7 @@ type Sb = {
 };
 
 export const getBrowserControl = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("developer_tools")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const userId = context.userId;
