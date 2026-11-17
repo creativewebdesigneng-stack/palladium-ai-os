@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 import { writeAudit, writeAuditRequired } from "@/lib/platform/audit.server";
 import { encryptToken } from "@/lib/integrations/oauth.server";
@@ -38,7 +38,7 @@ const externalMcpDraftSchema = z.object({
 }).strict();
 
 export const listExternalMcpServers = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("integrations")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const { data, error } = await sb
@@ -52,7 +52,7 @@ export const listExternalMcpServers = createServerFn({ method: "POST" })
 
 /** Read-only bounded projection of the existing registry, with no endpoint or secret fields. */
 export const getExternalMcpRegistryOverview = createServerFn({method:'POST'})
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("integrations")])
   .handler(async ({context})=>{
     const sb=context.supabase as unknown as Sb;
     const {data,error}=await sb.from('external_mcp_servers')
@@ -73,7 +73,7 @@ export const getExternalMcpRegistryOverview = createServerFn({method:'POST'})
   });
 
 export const saveExternalMcpServer = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("integrations")])
   .inputValidator((input: z.input<typeof externalMcpDraftSchema>) => externalMcpDraftSchema.parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -140,7 +140,7 @@ export const saveExternalMcpServer = createServerFn({ method: "POST" })
   });
 
 export const discoverExternalMcpServerTools = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("integrations")])
   .inputValidator((input: { serverId: string }) => input)
   .handler(async ({ data, context }) => {
     return listExternalMcpTools({
@@ -151,7 +151,7 @@ export const discoverExternalMcpServerTools = createServerFn({ method: "POST" })
   });
 
 export const deleteExternalMcpServer = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("integrations")])
   .inputValidator((input: { serverId: string }) => input)
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
