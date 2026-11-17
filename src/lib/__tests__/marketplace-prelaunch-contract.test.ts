@@ -7,6 +7,7 @@ const workspace = read("../../hooks/use-workspace.ts");
 const listingBrowser = read("../../components/marketplace/ListingBrowser.jsx");
 const toolMarketplace = read("../../screens/ToolMarketplace.jsx");
 const templates = read("../../screens/Templates.jsx");
+const legacyTemplateFixtures = read("../../components/templates/templatesData.jsx");
 const agentMarketplace = read("../../screens/AgentMarketplace.jsx");
 const creatorMarketplace = read("../../screens/CreatorMarketplace.jsx");
 
@@ -31,6 +32,9 @@ describe("marketplace loading and honest pre-launch states", () => {
     expect(templates).not.toContain("listMarketplaceAgents");
     expect(templates).not.toContain("installMarketplaceAgent");
     expect(templates).not.toContain("install.mutate");
+    expect(templates).not.toContain("templatesData");
+    expect(legacyTemplateFixtures).toContain("LEGACY ILLUSTRATIVE FIXTURES ONLY");
+    expect(legacyTemplateFixtures).toContain("fictional examples");
     expect(templates).toContain("illustrative mock templates are not shown as marketplace inventory");
   });
 
