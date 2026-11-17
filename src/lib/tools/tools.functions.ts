@@ -7,7 +7,7 @@
  * `tool_executions`.
  */
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
 import { writeAudit } from "@/lib/platform/audit.server";
 import { getEntitlements } from "@/lib/platform/entitlements.server";
 import { executeTool, resolveGrantedTools, TOOL_MANIFEST } from "@/lib/runtime/tools.server";
@@ -21,7 +21,7 @@ type Sb = { from: (t: string) => any; rpc: (fn: string, args?: Record<string, un
 
 /** Read only the existing executable catalogue; selecting a tool grants nothing. */
 export const listAgentToolChoices = createServerFn({method: "POST"})
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("integrations")])
   .handler(async ({context}) => {
     const sb=context.supabase as unknown as Sb;
     const {data,error}=await sb.from("tools").select("slug,name,description,is_active,min_plan,category").eq("is_active",true).order("name",{ascending:true});
@@ -31,7 +31,7 @@ export const listAgentToolChoices = createServerFn({method: "POST"})
   });
 
 export const getToolFramework = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("integrations")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const userId = context.userId;
@@ -85,7 +85,7 @@ export const getToolFramework = createServerFn({ method: "POST" })
 /* ----------------------------------------------------------------- permissions */
 
 export const saveToolPermission = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("integrations")])
   .inputValidator(
     (input: {
       tool: string;
@@ -171,7 +171,7 @@ export const saveToolPermission = createServerFn({ method: "POST" })
 /* ------------------------------------------------------------------- execution */
 
 export const runToolManually = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("integrations")])
   .inputValidator(
     (input: { agentId: string; tool: string; input?: Record<string, unknown> }) => input,
   )
@@ -233,7 +233,7 @@ export const runToolManually = createServerFn({ method: "POST" })
   });
 
 export const listToolExecutions = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("integrations")])
   .inputValidator((input: { tool?: string; limit?: number }) => input)
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
