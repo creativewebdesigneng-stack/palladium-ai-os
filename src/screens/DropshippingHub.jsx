@@ -65,6 +65,7 @@ export default function DropshippingHub(){
   const commerceRows=overview.data?.commerce??[];
   return <>
     <PageHeader eyebrow="Business · Commerce · AI" title="Dropshipping Hub" description="Research products, validate suppliers and margins, connect sales channels, orchestrate approved AI agents, build a branded Website Studio storefront and operate orders without duplicating provider credentials." />
+    <div role="note" className="mb-4 rounded-xl border border-amber-300/20 bg-amber-300/[.05] px-4 py-3 text-xs leading-5 text-amber-100/80"><strong className="text-amber-100">Planning examples, not live traction.</strong> The opportunity and supplier scores and unit-economics figures below are calculated from editable example assumptions. They are not verified sales, supplier performance, conversion rates or realised margins. Live market and supplier signals require connected providers.</div>
     {session==='no'&&<Failed message="Sign in to use Dropshipping Hub."/>}
     {overview.error&&<Failed message={friendlyMessage(overview.error)}/>} 
 
