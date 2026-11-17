@@ -1,3 +1,4 @@
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import {createServerFn} from '@tanstack/react-start';
 import {requireSupabaseAuth} from '@/lib/launch/launch-auth-middleware';
 import {listIntegrationCapabilities} from '@/lib/integrations/agent-integration-runtime.server';
