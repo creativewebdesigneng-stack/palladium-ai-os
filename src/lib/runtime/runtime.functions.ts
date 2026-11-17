@@ -3,7 +3,7 @@
  * identity comes from the verified bearer token, never from request data.
  */
 import { createServerFn } from "@tanstack/react-start";
-import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { executeAgentTask } from "./agent-task-execution.server";
 import { resolveAgentRuntimeSnapshot } from "./runtime-snapshot";
 import { TOOL_SLUGS } from "./tools.server";
