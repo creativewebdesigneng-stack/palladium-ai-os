@@ -1,6 +1,6 @@
 import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
-import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
+import { requireLaunchFeatureAuth } from '@/integrations/supabase/auth-middleware';
 import { writeAuditRequired } from '@/lib/platform/audit.server';
 import { SCIENTIFIC_SKILL_SOURCES, SCIENTIFIC_SKILLS_COMMIT } from './scientific-skill-sources';
 import { fetchPinnedScientificSkill } from './scientific-skills-import.server';
@@ -18,7 +18,7 @@ const BATCH = 4;
  * after errors or reloads from cursor 0 without replacing other user skills.
  */
 export const installScientificSkillBatch = createServerFn({method:'POST'})
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("agent_runtime")])
   .inputValidator((input:unknown)=>z.object({
     cursor:z.number().int().min(0).max(SCIENTIFIC_SKILL_SOURCES.length).default(0),
   }).parse(input))
@@ -85,7 +85,7 @@ export const installScientificSkillBatch = createServerFn({method:'POST'})
 
 /** Preview one verified source without modifying the user's skills or executing scripts. */
 export const previewScientificSkill = createServerFn({method:'POST'})
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("agent_runtime")])
   .inputValidator((input:unknown)=>z.object({id:z.string().min(1).max(100)}).parse(input))
   .handler(async ({data})=>{
     if(!scientificSkillSource(data.id)) throw new Error('Unknown scientific skill.');
