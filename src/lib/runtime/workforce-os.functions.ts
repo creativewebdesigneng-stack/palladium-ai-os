@@ -1,11 +1,11 @@
 import { createServerFn } from '@tanstack/react-start';
-import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
+import { requireLaunchFeatureAuth } from '@/integrations/supabase/auth-middleware';
 import { buildWorkforceOperatingState } from './workforce-os';
 
 type Sb = { from: (table: string) => any };
 
 export const getWorkforceOperatingState = createServerFn({ method: 'GET' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("workforce")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const [workforces, memberships, workflowRuns, fleetAssignments, approvals, identities, passports, delegations] = await Promise.all([
