@@ -7,7 +7,6 @@ import {
   ListChecks, Loader2, Search, Store, Users, Workflow, Zap,
 } from 'lucide-react'
 import { searchWorkspace } from '@/lib/search/search.functions'
-import { useAuth } from '@/lib/AuthContext'
 import { ADMIN_NAV, ALL_NAV_ITEMS, PRIMARY_NAV } from '@/components/palladium/navigationData'
 import { AstraMark } from '@/components/blackstar/AstraMark'
 import { useLaunchAccess } from '@/lib/launch/LaunchAccessProvider'
