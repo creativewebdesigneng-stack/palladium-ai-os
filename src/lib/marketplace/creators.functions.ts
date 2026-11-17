@@ -7,12 +7,12 @@
  */
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
 
 type Sb = { from: (t: string) => any };
 
 export const getCreatorProfile = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("creative_studio")])
   .inputValidator((input: unknown) =>
     z.object({ user_id: z.string().uuid().nullish() }).parse(input ?? {}),
   )
@@ -29,7 +29,7 @@ export const getCreatorProfile = createServerFn({ method: "POST" })
   });
 
 export const saveCreatorProfile = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("creative_studio")])
   .inputValidator((input: unknown) =>
     z
       .object({
