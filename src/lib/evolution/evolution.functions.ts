@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
 import { evaluateEvolutionCandidate, type EvolutionMetrics } from "./evolution";
 
 type Sb = { from: (table: string) => any };
@@ -24,7 +24,7 @@ const proposalSchema = z.object({
 });
 
 export const proposeAgentEvolution = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_hub")])
   .inputValidator((input: unknown) => proposalSchema.parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -64,7 +64,7 @@ export const proposeAgentEvolution = createServerFn({ method: "POST" })
   });
 
 export const listAgentEvolutionProposals = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_hub")])
   .inputValidator((input: unknown) => z.object({ agentId: z.string().uuid().nullish(), limit: z.number().int().min(1).max(100).default(25) }).parse(input ?? {}))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
