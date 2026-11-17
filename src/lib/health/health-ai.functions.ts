@@ -1,6 +1,6 @@
 import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
-import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
+import { requireLaunchFeatureAuth } from '@/integrations/supabase/auth-middleware';
 import { resolveAssistantModelPreference } from '@/lib/ai/ai-preferences.server';
 import { runChat, type ChatMessage } from '@/lib/runtime/model-gateway.server';
 import { assertWithinLimit, EntitlementError, getEntitlements, recordUsage } from '@/lib/platform/entitlements.server';
@@ -48,7 +48,7 @@ function json(value: unknown, max = 16000) {
 }
 
 export const runHealthCoachInquiry = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("health_fitness")])
   .inputValidator((value: unknown) => inquirySchema.parse(value))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
