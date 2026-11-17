@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
 import { listIntegrationCapabilities, normalizeIntegrationProvider } from "@/lib/integrations/agent-integration-runtime.server";
 import { writeAudit } from "@/lib/platform/audit.server";
 
@@ -26,7 +26,7 @@ function assertSecretFree(value: unknown, depth = 0): void {
 }
 
 export const getSupportExtensions = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("notifications")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const inboxes = await sb.from("support_inboxes").select("id,name,channel,integration_provider,integration_connection_id,business_hours,auto_assignment,status,created_at,updated_at").order("created_at", { ascending: false }).limit(100);
@@ -51,7 +51,7 @@ export const getSupportExtensions = createServerFn({ method: "POST" })
   });
 
 export const createSupportInbox = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("notifications")])
   .inputValidator((input: unknown) => z.object({
     name: z.string().trim().min(1).max(120),
     channel: z.enum(["web","email","chat","phone","whatsapp","facebook","instagram","telegram","line","sms","api","other"]),
@@ -78,7 +78,7 @@ export const createSupportInbox = createServerFn({ method: "POST" })
   });
 
 export const saveSupportArticle = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("notifications")])
   .inputValidator((input: unknown) => z.object({
     title: z.string().trim().min(1).max(240),
     slug: z.string().trim().min(1).max(180).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
@@ -96,7 +96,7 @@ export const saveSupportArticle = createServerFn({ method: "POST" })
   });
 
 export const saveCannedResponse = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("notifications")])
   .inputValidator((input: unknown) => z.object({ name: z.string().trim().min(1).max(120), shortcut: z.string().trim().min(1).max(60).regex(/^[/a-zA-Z0-9_-]+$/), content: z.string().trim().min(1).max(10000) }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -106,7 +106,7 @@ export const saveCannedResponse = createServerFn({ method: "POST" })
   });
 
 export const addPrivateTicketNote = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("notifications")])
   .inputValidator((input: unknown) => z.object({ ticketId: z.string().uuid(), body: z.string().trim().min(1).max(4000) }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
