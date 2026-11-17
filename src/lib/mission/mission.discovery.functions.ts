@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { writeAudit } from "@/lib/platform/audit.server";
 import { googleShoppingConfigured } from "@/lib/shopping/google-shopping.server";
 import {
