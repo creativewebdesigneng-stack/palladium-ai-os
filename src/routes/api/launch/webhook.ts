@@ -35,7 +35,11 @@ export const Route = createFileRoute("/api/launch/webhook")({
             const subscription = await stripe.subscriptions.retrieve(String(session.subscription));
             await saveEntitlement(db, subscription, String(session.customer), event.livemode ? "live" : "test");
           } else if (event.type === "customer.subscription.updated" || event.type === "customer.subscription.deleted") {
-            const subscription = event.data.object as Stripe.Subscription;
+            const eventSubscription = event.data.object as Stripe.Subscription;
+            // Stripe may retry or deliver subscription events out of order. Re-read
+            // the current object so an older "active" update cannot restore access
+            // after a later cancellation has already been processed.
+            const subscription = await stripe.subscriptions.retrieve(eventSubscription.id);
             if (subscription.metadata?.["kind"] !== "blackstar_founding_pilot") return Response.json({ received: true });
             const customerId = typeof subscription.customer === "string" ? subscription.customer : subscription.customer.id;
             await saveEntitlement(db, subscription, customerId, event.livemode ? "live" : "test");
