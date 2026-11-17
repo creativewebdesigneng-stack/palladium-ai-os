@@ -3,7 +3,7 @@
  * comes from the verified bearer token.
  */
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
 import { EntitlementError } from "@/lib/platform/entitlements.server";
 import { decideWorkflowApproval } from "./workflow-approval-decision.server";
 import {
@@ -84,7 +84,7 @@ async function requireAssignableAgents(
 
 /** Workforces with their member agents and the workflows they own. */
 export const listWorkforces = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("workforce")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const [{ data: workforces }, { data: members }, { data: workflows }] = await Promise.all([
@@ -103,7 +103,7 @@ export const listWorkforces = createServerFn({ method: "GET" })
 
 /** Creates a workforce and attaches its agents with roles. */
 export const saveWorkforce = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("workforce")])
   .inputValidator(
     (input: {
       id?: string;
@@ -182,7 +182,7 @@ export const saveWorkforce = createServerFn({ method: "POST" })
 
 /** Creates or replaces a workflow and its ordered, dependency-aware steps. */
 export const saveWorkflow = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("workforce")])
   .inputValidator(
     (input: {
       id?: string;
@@ -282,7 +282,7 @@ export const saveWorkflow = createServerFn({ method: "POST" })
 
 /** Runs a workflow across its workforce (sequential / parallel / conditional). */
 export const runWorkflow = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("workforce")])
   .inputValidator((input: { workflow_id: string; input: string }) => {
     if (!input?.workflow_id) throw new Error("A workflow is required.");
     return { workflow_id: String(input.workflow_id), input: String(input.input ?? "") };
@@ -304,7 +304,7 @@ export const runWorkflow = createServerFn({ method: "POST" })
 /** Requests cancellation of an active workflow run. The runtime will abort any
  * in-flight agent/model/tool work and mark the run cancelled. */
 export const cancelWorkflowRun = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("workforce")])
   .inputValidator((input: { run_id: string }) => {
     if (!input?.run_id) throw new Error("A workflow run is required.");
     return { run_id: String(input.run_id) };
@@ -324,7 +324,7 @@ export const cancelWorkflowRun = createServerFn({ method: "POST" })
 /** Owner-only decision for a workflow approval. Approved runs resume on the
  * same durable workflow_runs row; rejected runs obey continue_on_error. */
 export const decideWorkflowApprovalRequest = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("workforce")])
   .inputValidator((input: {
     approval_request_id: string;
     decision: "approved" | "rejected";
@@ -356,7 +356,7 @@ export const decideWorkflowApprovalRequest = createServerFn({ method: "POST" })
 
 /** A workflow, its steps and its recent runs. */
 export const getWorkflow = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("workforce")])
   .inputValidator((input: { workflow_id: string }) => ({
     workflow_id: String(input?.workflow_id ?? ""),
   }))
@@ -382,7 +382,7 @@ export const getWorkflow = createServerFn({ method: "POST" })
 
 /** The execution ledger for one run: per-step attempts and agent handoffs. */
 export const getWorkflowRun = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("workforce")])
   .inputValidator((input: { run_id: string }) => ({ run_id: String(input?.run_id ?? "") }))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
