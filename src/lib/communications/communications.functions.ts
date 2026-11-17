@@ -1,6 +1,6 @@
 import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
-import { requireLaunchFeatureAuth } from '@/integrations/supabase/auth-middleware';
+import { requireLaunchFeatureAuth } from '@/lib/launch/launch-auth-middleware';
 import { supabaseAdmin } from '@/integrations/supabase/client.server';
 import { writeAudit } from '@/lib/platform/audit.server';
 import { resolveSelectedCallContext } from './call-context.server';
