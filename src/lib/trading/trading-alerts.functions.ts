@@ -1,6 +1,6 @@
 import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
-import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
+import { requireLaunchFeatureAuth } from '@/integrations/supabase/auth-middleware';
 import { writeAudit } from '@/lib/platform/audit.server';
 import { normaliseTradingSymbol, type TradingMarketKind } from './market-data';
 import { loadTradingMarketSeriesFromProvider } from './market-data.server';
@@ -64,7 +64,7 @@ function providerKey(kind: TradingMarketKind, symbol: string) {
 }
 
 export const listTradingMarketAlerts = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("finance")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const { data, error } = await sb
@@ -78,7 +78,7 @@ export const listTradingMarketAlerts = createServerFn({ method: 'POST' })
   });
 
 export const saveTradingMarketAlert = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("finance")])
   .inputValidator((value: unknown) => alertSchema.parse(value))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -116,7 +116,7 @@ export const saveTradingMarketAlert = createServerFn({ method: 'POST' })
   });
 
 export const deleteTradingMarketAlert = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("finance")])
   .inputValidator((value: unknown) => idSchema.parse(value))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -130,7 +130,7 @@ export const deleteTradingMarketAlert = createServerFn({ method: 'POST' })
   });
 
 export const evaluateTradingMarketAlerts = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("finance")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const { data, error } = await sb
