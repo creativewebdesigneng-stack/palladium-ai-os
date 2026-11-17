@@ -12,6 +12,13 @@ import { useSessionReady } from '@/lib/useSessionReady';
 import { Empty, Loading, Failed } from '@/components/business/live';
 import { useToast } from '@/components/ui/use-toast';
 
+function withTemplateMarketplaceTimeout(promise, timeoutMs = 15000) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('The template catalogue did not respond within 15 seconds.')), timeoutMs);
+    Promise.resolve(promise).then(resolve, reject).finally(() => clearTimeout(timer));
+  });
+}
+
 const SORTS = [
   { id: 'popular', label: 'Most used' },
   { id: 'rating', label: 'Top rated' },
@@ -60,7 +67,7 @@ export default function Templates() {
 
   const listings = useQuery({
     queryKey: ['marketplace-templates'],
-    queryFn: () => listFn({ data: {} }),
+    queryFn: () => withTemplateMarketplaceTimeout(listFn({ data: {} })),
     enabled: session === 'yes',
     retry: false,
   });
@@ -125,6 +132,7 @@ export default function Templates() {
         }
       />
 
+      {session === 'unknown' && <Loading label="Checking your marketplace access…" />}
       {session === 'no' && <Failed message="Sign in to browse marketplace templates." />}
       {session === 'yes' && listings.isLoading && <Loading label="Loading published templates…" />}
       {listings.isError && (
