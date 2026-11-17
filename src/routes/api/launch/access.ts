@@ -20,8 +20,8 @@ export const Route = createFileRoute("/api/launch/access")({
         });
         const { data, error } = await supabase.auth.getClaims(token);
         const claims = data?.claims as Record<string, unknown> | undefined;
-        const userId = typeof claims?.sub === "string" ? claims.sub : null;
-        const email = typeof claims?.email === "string" ? claims.email : null;
+        const userId = typeof claims?.["sub"] === "string" ? claims.sub : null;
+        const email = typeof claims?.["email"] === "string" ? claims.email : null;
         if (error || !userId) return json({ error: "Unauthorized" }, 401);
 
         const env = process.env as Record<string, string | undefined>;
