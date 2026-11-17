@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { normaliseAgentIdentity } from "@/lib/agents/agent-identity";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
 import { writeAudit } from "@/lib/platform/audit.server";
 import {
   aiBriefing,
@@ -70,7 +70,7 @@ async function activity(
 /* ------------------------------------------------------------------ overview */
 
 export const getMissionOverview = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("mission_control")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const userId = context.userId;
@@ -333,7 +333,7 @@ export const savePersonalAgent = createServerFn({ method: "POST" })
     if (!input?.name?.trim()) throw new Error("Agent name is required");
     return input;
   })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("agent_runtime")])
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
     const userId = context.userId;
@@ -442,7 +442,7 @@ export const savePersonalAgent = createServerFn({ method: "POST" })
 
 export const deletePersonalAgent = createServerFn({ method: "POST" })
   .inputValidator((input: { id: string }) => input)
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("agent_runtime")])
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
     const res = await sb
@@ -467,7 +467,7 @@ export const submitPersonalTask = createServerFn({ method: "POST" })
     if (!input?.request?.trim()) throw new Error("Tell your agent what you need");
     return { request: input.request.trim(), agentId: input.agentId ?? null };
   })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("agent_runtime")])
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
     const userId = context.userId;
@@ -789,7 +789,7 @@ export const submitPersonalTask = createServerFn({ method: "POST" })
 
 export const updateTaskStatus = createServerFn({ method: "POST" })
   .inputValidator((input: { id: string; status: string }) => input)
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("agent_runtime")])
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
     const allowed = ["pending", "queued", "running", "completed", "cancelled"];
@@ -815,7 +815,7 @@ export const decideApproval = createServerFn({ method: "POST" })
       throw new Error("Invalid decision");
     return input;
   })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("agent_runtime")])
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
     const userId = context.userId;
@@ -982,7 +982,7 @@ export const decideApproval = createServerFn({ method: "POST" })
 
 export const chooseAlternative = createServerFn({ method: "POST" })
   .inputValidator((input: { approvalId: string; resultId: string }) => input)
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("commerce")])
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
     const userId = context.userId;
@@ -1097,7 +1097,7 @@ export const chooseAlternative = createServerFn({ method: "POST" })
 
 export const confirmPurchase = createServerFn({ method: "POST" })
   .inputValidator((input: { purchaseId: string }) => input)
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("commerce")])
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
     const userId = context.userId;
@@ -1140,7 +1140,7 @@ export const confirmPurchase = createServerFn({ method: "POST" })
 
 export const saveMemory = createServerFn({ method: "POST" })
   .inputValidator((input: { id?: string; category: string; key: string; value: unknown }) => input)
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("memory")])
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
     const row = {
@@ -1167,7 +1167,7 @@ export const saveMemory = createServerFn({ method: "POST" })
 
 export const deleteMemory = createServerFn({ method: "POST" })
   .inputValidator((input: { id: string }) => input)
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("memory")])
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
     const res = await sb
@@ -1181,7 +1181,7 @@ export const deleteMemory = createServerFn({ method: "POST" })
 
 export const markNotifications = createServerFn({ method: "POST" })
   .inputValidator((input: { id?: string; all?: boolean }) => input)
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("notifications")])
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
     let q = sb
@@ -1196,7 +1196,7 @@ export const markNotifications = createServerFn({ method: "POST" })
 
 export const clearMemoryCategory = createServerFn({ method: "POST" })
   .inputValidator((input: { category: string }) => input)
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("memory")])
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
     const res = await sb
