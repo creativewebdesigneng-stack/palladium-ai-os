@@ -3,7 +3,7 @@
  * comes from the verified bearer token.
  */
 import { createServerFn } from "@tanstack/react-start";
-import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { EntitlementError } from "@/lib/platform/entitlements.server";
 import { decideWorkflowApproval } from "./workflow-approval-decision.server";
 import {
