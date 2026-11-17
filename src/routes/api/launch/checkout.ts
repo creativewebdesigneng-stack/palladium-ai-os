@@ -16,8 +16,8 @@ export const Route = createFileRoute("/api/launch/checkout")({
         const mode = process.env["STRIPE_MODE"] ?? "test";
         const secret = process.env["STRIPE_SECRET_KEY"];
         if (mode !== "test" && mode !== "live") return json({ error: "STRIPE_MODE must be test or live." }, 503);
-        if (mode === "test" && secret && !secret.startsWith("sk_test_")) {
-          return json({ error: "Test deployments must use a Stripe test secret key." }, 503);
+        if (secret && !secret.startsWith(mode === "test" ? "sk_test_" : "sk_live_")) {
+          return json({ error: `STRIPE_SECRET_KEY must match STRIPE_MODE=${mode}.` }, 503);
         }
         const setupPrice = process.env["STRIPE_FOUNDING_PILOT_SETUP_PRICE_ID"];
         const monthlyPrice = process.env["STRIPE_FOUNDING_PILOT_MONTHLY_PRICE_ID"];
