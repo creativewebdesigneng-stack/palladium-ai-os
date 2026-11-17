@@ -14,7 +14,7 @@ const inputSchema = z.object({
 })
 
 export const requestBlackstarOpportunityApproval = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_hub")])
   .inputValidator((input: unknown) => inputSchema.parse(input))
   .handler(async ({ data, context }) => {
     const [goalRes, runsRes, agentsRes, workflowsRes] = await Promise.all([
