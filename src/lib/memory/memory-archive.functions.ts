@@ -1,6 +1,6 @@
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
-import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware'
+import { requireSupabaseAuth } from '@/lib/launch/launch-auth-middleware'
 import { buildMemoryArchiveOverview, type ArchiveMemoryRow, type ArchiveDocumentRow } from './memory-archive'
 
 type Sb={from:(table:string)=>any}
