@@ -1,6 +1,6 @@
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
-import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware'
+import { requireSupabaseAuth } from '@/lib/launch/launch-auth-middleware'
 import { resolveAssistantModelPreference } from '@/lib/ai/ai-preferences.server'
 import { runChat, type ChatMessage } from '@/lib/runtime/model-gateway.server'
 import { getCinemaCapabilities, submitCinemaRender } from './cinema-runtime.server'
