@@ -1,6 +1,6 @@
 import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
-import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
+import { requireLaunchFeatureAuth } from '@/integrations/supabase/auth-middleware';
 import { buildWebsiteRuntimePackage } from '@/lib/website-studio/website-package.server';
 import {
   githubFormTokenTarget,
@@ -110,14 +110,14 @@ async function createGithubBlob(token:string,owner:string,repo:string,data:strin
 }
 
 export const getWebsiteStudioGithubStatus=createServerFn({method:'POST'})
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("developer_tools")])
   .handler(async()=>{
     const {configured,allowedRepositories}=githubConfig();
     return {configured,provider:'github',allowedRepositoryCount:allowedRepositories.size};
   });
 
 export const syncWebsiteStudioGithub=createServerFn({method:'POST'})
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("developer_tools")])
   .inputValidator((value:unknown)=>syncSchema.parse(value))
   .handler(async({data,context})=>{
     const sb=context.supabase as unknown as Sb;
