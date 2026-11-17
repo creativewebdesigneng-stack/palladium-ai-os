@@ -1,6 +1,6 @@
 import {createServerFn} from '@tanstack/react-start';
 import {z} from 'zod';
-import {requireSupabaseAuth} from '@/integrations/supabase/auth-middleware';
+import {requireSupabaseAuth} from '@/lib/launch/launch-auth-middleware';
 
 type Sb={from:(table:string)=>any};
 const itemSchema=z.object({projectId:z.string().uuid(),collectionKey:z.string().trim().min(1).max(120),slug:z.string().trim().min(1).max(160),title:z.string().max(240).default(''),data:z.record(z.string(),z.unknown()).default({}),status:z.enum(['draft','published','archived']).default('draft')});
