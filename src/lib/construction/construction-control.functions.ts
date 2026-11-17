@@ -1,6 +1,6 @@
 import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
-import { requireLaunchFeatureAuth } from '@/integrations/supabase/auth-middleware';
+import { requireLaunchFeatureAuth } from '@/lib/launch/launch-auth-middleware';
 type Sb={from:(t:string)=>any}; const uuid=z.string().uuid(); const opt=z.string().trim().max(8000).optional();
 async function save(sb:Sb,table:string,userId:string,data:any){const{id,...v}=data;const row={...v,updated_at:new Date().toISOString()};const q=id?await sb.from(table).update(row).eq('id',id).eq('user_id',userId).select().single():await sb.from(table).insert({...row,user_id:userId}).select().single();if(q.error)throw new Error(q.error.message);return q.data;}
 const field=z.object({id:uuid.optional(),workspace_id:uuid,project_id:uuid.nullish(),record_type:z.enum(['rams','permit','incident','near_miss','ncr','snag','rfi','toolbox_talk','daily_diary','handover']),title:z.string().trim().min(1).max(240),reference:z.string().max(100).optional(),status:z.enum(['draft','open','submitted','approved','rejected','in_progress','resolved','closed']).default('open'),risk_level:z.enum(['low','medium','high','critical']).default('medium'),description:opt,responsible_person:z.string().max(180).optional(),due_at:z.string().datetime({offset:true}).nullish()});
