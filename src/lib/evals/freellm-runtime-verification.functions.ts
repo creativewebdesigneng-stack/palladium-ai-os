@@ -45,7 +45,7 @@ function safeFailure(error: unknown, timedOut = false): { code: FailureCode; mes
 }
 
 export const verifyFreeLlmEvaluatorRuntime = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_models")])
   .handler(async ({ context }) => {
     const config = resolveFreeLlmEvaluatorConfig()
     const started = Date.now()
