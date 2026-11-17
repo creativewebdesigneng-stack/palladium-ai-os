@@ -19,13 +19,13 @@ export default function TemplateCard({ t, onPreview, onUse, onFav, favs }) {
         </div>
         <p className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-zinc-400">{t.desc}</p>
         <div className="mt-2 flex items-center gap-2 text-[10px] text-zinc-500">
-          <span className="flex items-center gap-0.5 text-amber-300"><Star className="h-3 w-3 fill-amber-300" />{t.rating}</span>
+          {t.rating !== "—" && <span className="flex items-center gap-0.5 text-amber-300"><Star className="h-3 w-3 fill-amber-300" />{t.rating}</span>}
           <span>·</span><span>{t.uses==null?'Usage unavailable':`${t.uses.toLocaleString()} uses`}</span>
           <span>·</span><span className="truncate">{t.creator}</span>
         </div>
         <div className="mt-3 grid grid-cols-3 gap-1.5 border-t border-white/5 pt-3">
           <button onClick={() => onPreview(t)} className="flex items-center justify-center gap-1 rounded-lg border border-white/10 py-1.5 text-[10px] text-zinc-300 hover:bg-white/5"><Eye className="h-3 w-3" />Preview</button>
-          <button onClick={() => onUse(t)} className="flex items-center justify-center gap-1 rounded-lg border border-violet-400/20 bg-violet-500/15 py-1.5 text-[10px] text-violet-200 hover:bg-violet-500/25"><ArrowRight className="h-3 w-3" />Use</button>
+          <button onClick={() => onUse(t)} className="flex items-center justify-center gap-1 rounded-lg border border-violet-400/20 bg-violet-500/15 py-1.5 text-[10px] text-violet-200 hover:bg-violet-500/25"><ArrowRight className="h-3 w-3" />Open marketplace</button>
           <button onClick={() => navigator.clipboard?.writeText(window.location.origin + '/templates#' + t.id)} className="flex items-center justify-center gap-1 rounded-lg border border-white/10 py-1.5 text-[10px] text-zinc-300 hover:bg-white/5"><Share2 className="h-3 w-3" />Share</button>
         </div>
       </div>
