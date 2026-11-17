@@ -1,3 +1,4 @@
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import {createServerFn} from '@tanstack/react-start';import {z} from 'zod';import {requireSupabaseAuth} from '@/lib/launch/launch-auth-middleware';import {MARKETPLACE_LISTING_FEE_PENCE,marketplaceSaleFee} from './fees';
 type Sb={from:(t:string)=>any};
 const input=z.object({title:z.string().trim().min(2).max(120),description:z.string().trim().max(10000).default(''),item_type:z.enum(['ai_tool','website','app','agent','template','automation','code','design','dataset','prompt_pack','plugin','other']),price:z.number().min(0).max(10_000_000),delivery_type:z.enum(['digital','license','source_code','repository_access','service_handoff','other']).default('digital'),preview_url:z.string().url().optional().or(z.literal('')),tags:z.array(z.string().trim().max(40)).max(20).default([])});
