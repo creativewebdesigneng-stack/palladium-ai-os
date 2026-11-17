@@ -1,11 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
 import { queueWorkflowRun } from "./workflow-queue.server";
 
 type Sb = { from: (t: string) => any };
 
 export const queueWorkflow = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("automation")])
   .inputValidator((input: { workflow_id: string; input: string }) => {
     const workflow_id = String(input?.workflow_id ?? "").trim();
     const objective = String(input?.input ?? "").trim();
