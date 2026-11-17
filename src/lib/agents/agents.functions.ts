@@ -6,7 +6,7 @@
  */
 import { AGENT_MODEL_CHOICES, normaliseAgentModelSelection } from "./agent-model-selection";
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from 'zod';
 import { normaliseAutonomyLevel } from "./agent-autonomy";
 import { normaliseAgentIdentity } from "./agent-identity";
@@ -111,7 +111,7 @@ export function normaliseAgentWrite(input: AgentWriteInput) {
  * view. RLS scopes every table to rows the caller can access.
  */
 export const listAgents = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("agent_runtime")])
   .inputValidator((input: { limit?: number; withTasks?: boolean } | undefined) => ({
     limit: Math.min(Math.max(Number(input?.limit ?? 100), 1), 500),
     withTasks: input?.withTasks !== false,
@@ -168,7 +168,7 @@ export const listAgents = createServerFn({ method: "POST" })
 
 /** Flips an agent's lifecycle status. Ownership is enforced by RLS + filter. */
 export const setAgentStatus = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("agent_runtime")])
   .inputValidator((input: { id: string; status: string }) => {
     if (!input?.id) throw new Error("Agent id is required");
     if (!AGENT_STATUSES.includes(input.status)) throw new Error("Unknown agent status");
@@ -190,7 +190,7 @@ export const setAgentStatus = createServerFn({ method: "POST" })
 
 /** Copies one of the caller's own agents into a new draft. */
 export const duplicateAgent = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("agent_runtime")])
   .inputValidator((input: { id: string }) => {
     if (!input?.id) throw new Error("Agent id is required");
     return { id: String(input.id) };
@@ -226,7 +226,7 @@ export const duplicateAgent = createServerFn({ method: "POST" })
 
 /** Creates an agent for the caller from the workspace / wizard form. */
 export const createAgent = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("agent_runtime")])
   .inputValidator((input: AgentWriteInput) => normaliseAgentWrite(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -262,7 +262,7 @@ export const createAgent = createServerFn({ method: "POST" })
 
 /** Updates the full intelligence configuration of one of the caller's agents. */
 export const updateAgent = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("agent_runtime")])
   .inputValidator((input: AgentWriteInput & { id: string }) => {
     if (!input?.id) throw new Error("Agent id is required");
     return { id: String(input.id), ...normaliseAgentWrite(input) };
@@ -298,7 +298,7 @@ export const updateAgent = createServerFn({ method: "POST" })
 
 /** Changes the model for future runs without rewriting other configuration. */
 export const updateAgentModel = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("agent_runtime")])
   .inputValidator((input: unknown) => z.object({
     id: z.string().uuid(), choice: z.string().min(1).max(80),
     expectedUpdatedAt: z.string().min(1).max(80),
@@ -310,7 +310,7 @@ export const updateAgentModel = createServerFn({ method: 'POST' })
 
 /** Permanently deletes one of the caller's agents. */
 export const deleteAgent = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("agent_runtime")])
   .inputValidator((input: { id: string }) => {
     if (!input?.id) throw new Error("Agent id is required");
     return { id: String(input.id) };
@@ -328,7 +328,7 @@ export const deleteAgent = createServerFn({ method: "POST" })
 
 /** Updates tool selection only; existing permission and approval policy stays authoritative. */
 export const updateAgentTools = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("agent_runtime")])
   .inputValidator((input: unknown) => z.object({
     id: z.string().uuid(), tools: z.array(z.string().min(1).max(80)).max(30),
     expectedUpdatedAt: z.string().min(1).max(80),
@@ -341,7 +341,7 @@ export const updateAgentTools = createServerFn({ method: 'POST' })
 
 /** Lists existing OAuth/Nango/GitHub App connections for this user's agents. */
 export const listAgentConnectorChoices = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("agent_runtime")])
   .handler(async ({ context }) => {
     const { listOwnedAgentConnectorChoices } = await import('./agent-connectors.server');
     const { getUserGitHubInstallationId } = await import('@/lib/integrations/github-connected-service.server');
@@ -354,7 +354,7 @@ export const listAgentConnectorChoices = createServerFn({ method: 'POST' })
 
 /** Assigns only actually connected apps; existing tool grants and approvals still govern execution. */
 export const updateAgentConnectors = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("agent_runtime")])
   .inputValidator((input: unknown) => z.object({
     id: z.string().uuid(),
     providers: z.array(z.string().trim().min(1).max(80)).max(30),
