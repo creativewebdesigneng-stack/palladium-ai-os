@@ -69,7 +69,7 @@ async function assertWorkspace(sb:Sb,userId:string,workspaceId:string|null|undef
 }
 
 export const listDropshippingOpportunities=createServerFn({method:'POST'})
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("commerce")])
   .handler(async({context})=>{
     const sb=context.supabase as unknown as Sb;
     const {data,error}=await sb.from('dropshipping_opportunities').select('*').eq('user_id',context.userId).order('updated_at',{ascending:false}).limit(300);
@@ -78,7 +78,7 @@ export const listDropshippingOpportunities=createServerFn({method:'POST'})
   });
 
 export const saveDropshippingOpportunity=createServerFn({method:'POST'})
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("commerce")])
   .validator((value:unknown)=>opportunitySchema.parse(value))
   .handler(async({data,context})=>{
     const sb=context.supabase as unknown as Sb;
@@ -123,7 +123,7 @@ export const saveDropshippingOpportunity=createServerFn({method:'POST'})
   });
 
 export const updateDropshippingOpportunityStatus=createServerFn({method:'POST'})
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("commerce")])
   .validator((value:unknown)=>z.object({id:uuid,status:z.enum(['watching','testing','winner','paused','rejected'])}).parse(value))
   .handler(async({data,context})=>{
     const sb=context.supabase as unknown as Sb;
@@ -150,7 +150,7 @@ async function loadOwnedOpportunity(sb:Sb,userId:string,id:string){
 }
 
 export const listDropshippingSupplierEvidence=createServerFn({method:'POST'})
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("commerce")])
   .validator((value:unknown)=>z.object({opportunity_id:uuid.optional()}).parse(value??{}))
   .handler(async({data,context})=>{
     const sb=context.supabase as unknown as Sb;
@@ -165,7 +165,7 @@ export const listDropshippingSupplierEvidence=createServerFn({method:'POST'})
   });
 
 export const saveDropshippingSupplierEvidence=createServerFn({method:'POST'})
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("commerce")])
   .validator((value:unknown)=>supplierEvidenceSchema.parse(value))
   .handler(async({data,context})=>{
     const sb=context.supabase as unknown as Sb;
@@ -222,7 +222,7 @@ export const saveDropshippingSupplierEvidence=createServerFn({method:'POST'})
   });
 
 export const deleteDropshippingSupplierEvidence=createServerFn({method:'POST'})
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("commerce")])
   .validator((value:unknown)=>z.object({id:uuid,opportunity_id:uuid}).parse(value))
   .handler(async({data,context})=>{
     const sb=context.supabase as unknown as Sb;
@@ -240,7 +240,7 @@ export const deleteDropshippingSupplierEvidence=createServerFn({method:'POST'})
 
 
 export const listDropshippingOpportunitySnapshots=createServerFn({method:'POST'})
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("commerce")])
   .validator((value:unknown)=>z.object({opportunity_id:uuid.optional()}).parse(value??{}))
   .handler(async({data,context})=>{
     const sb=context.supabase as unknown as Sb;
@@ -252,7 +252,7 @@ export const listDropshippingOpportunitySnapshots=createServerFn({method:'POST'}
   });
 
 export const recordDropshippingOpportunitySnapshot=createServerFn({method:'POST'})
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("commerce")])
   .validator((value:unknown)=>snapshotSchema.parse(value))
   .handler(async({data,context})=>{
     const sb=context.supabase as unknown as Sb;
@@ -308,7 +308,7 @@ export const recordDropshippingOpportunitySnapshot=createServerFn({method:'POST'
 
 
 export const updateDropshippingOpportunityMonitor=createServerFn({method:'POST'})
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("commerce")])
   .validator((value:unknown)=>z.object({
     id:uuid,
     enabled:z.boolean(),
