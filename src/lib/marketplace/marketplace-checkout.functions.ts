@@ -1,4 +1,4 @@
-import {createServerFn} from '@tanstack/react-start';import {z} from 'zod';import {requireSupabaseAuth} from '@/integrations/supabase/auth-middleware';import {MARKETPLACE_LISTING_FEE_PENCE} from './fees';
+import {createServerFn} from '@tanstack/react-start';import {z} from 'zod';import {requireSupabaseAuth} from '@/lib/launch/launch-auth-middleware';import {MARKETPLACE_LISTING_FEE_PENCE} from './fees';
 import {requireUnpaidListingFee,quoteRecordedPurchase,requireRecordedStripeSession} from './checkout-safety';import {marketplaceBaseUrl,marketplaceStripe} from './stripe.server';type Sb={from:(t:string)=>any};
 export const createMarketplaceListingFeeCheckout=createServerFn({method:'POST'})
   .middleware([requireLaunchFeatureAuth("agent_marketplace")])
