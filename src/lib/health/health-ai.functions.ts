@@ -1,6 +1,6 @@
 import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
-import { requireLaunchFeatureAuth } from '@/integrations/supabase/auth-middleware';
+import { requireLaunchFeatureAuth } from '@/lib/launch/launch-auth-middleware';
 import { resolveAssistantModelPreference } from '@/lib/ai/ai-preferences.server';
 import { runChat, type ChatMessage } from '@/lib/runtime/model-gateway.server';
 import { assertWithinLimit, EntitlementError, getEntitlements, recordUsage } from '@/lib/platform/entitlements.server';
