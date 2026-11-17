@@ -6,7 +6,7 @@
  */
 import { AGENT_MODEL_CHOICES, normaliseAgentModelSelection } from "./agent-model-selection";
 import { createServerFn } from "@tanstack/react-start";
-import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { z } from 'zod';
 import { normaliseAutonomyLevel } from "./agent-autonomy";
 import { normaliseAgentIdentity } from "./agent-identity";
