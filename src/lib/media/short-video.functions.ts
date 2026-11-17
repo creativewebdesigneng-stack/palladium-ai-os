@@ -1,6 +1,6 @@
 import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
-import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
+import { requireLaunchFeatureAuth } from '@/integrations/supabase/auth-middleware';
 import { resolveAssistantModelPreference } from '@/lib/ai/ai-preferences.server';
 import { runChat, type ChatMessage } from '@/lib/runtime/model-gateway.server';
 import { writeAudit } from '@/lib/platform/audit.server';
@@ -13,7 +13,7 @@ const subtitleMode = z.enum(['sentence', 'word']);
 const transition = z.enum(['none', 'fade', 'slide']);
 
 export const getShortVideoOverview = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("creative_studio")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const { data, error } = await sb.from('media_generation_jobs')
@@ -27,7 +27,7 @@ export const getShortVideoOverview = createServerFn({ method: 'POST' })
   });
 
 export const planShortVideoScript = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("creative_studio")])
   .inputValidator((input: unknown) => z.object({
     topic: z.string().trim().min(3).max(2000),
     durationSeconds: z.number().int().min(15).max(180),
@@ -65,7 +65,7 @@ export const planShortVideoScript = createServerFn({ method: 'POST' })
   });
 
 export const createShortVideoJob = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("creative_studio")])
   .inputValidator((input: unknown) => z.object({
     script: z.string().trim().min(10).max(20_000),
     aspectRatio: z.enum(['9:16', '16:9', '1:1']),
@@ -134,7 +134,7 @@ export const createShortVideoJob = createServerFn({ method: 'POST' })
   });
 
 export const refreshShortVideoJob = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("creative_studio")])
   .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
