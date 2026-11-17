@@ -1,6 +1,6 @@
 import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
-import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
+import { requireLaunchFeatureAuth } from '@/integrations/supabase/auth-middleware';
 
 type Sb = { from: (table: string) => any };
 const uuid = z.string().uuid();
@@ -9,7 +9,7 @@ const sum = (rows: any[], key: string) =>
   rows.reduce((total, row) => total + Number(row[key] || 0), 0);
 
 export const getConstructionPortfolioAnalytics = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("business_hub")])
   .validator((value: unknown) => z.object({ workspace_id: uuid }).parse(value))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
