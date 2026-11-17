@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
 import {
   listAsanaWorkspaces,
   searchAsanaProjects,
@@ -18,14 +18,14 @@ function optionalGid(value: unknown, label: string): string | undefined {
 }
 
 export const listConnectedAsanaWorkspaces = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("integrations")])
   .inputValidator((input: { limit?: number }) => ({ limit: limit(input?.limit, 50, 100) }))
   .handler(async ({ data, context }) =>
     listAsanaWorkspaces({ userId: context.userId, limit: data.limit }),
   );
 
 export const searchConnectedAsanaProjects = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("integrations")])
   .inputValidator((input: { query: string; workspaceId?: string; limit?: number }) => {
     const query = String(input?.query ?? "").replace(/[\r\n\t]+/g, " ").trim().slice(0, 300);
     if (!query) throw new Error("An Asana project search query is required");
@@ -45,7 +45,7 @@ export const searchConnectedAsanaProjects = createServerFn({ method: "POST" })
   );
 
 export const searchConnectedAsanaProjectTasks = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("integrations")])
   .inputValidator((input: { projectId: string; query?: string; limit?: number }) => {
     const projectId = optionalGid(input?.projectId, "project");
     if (!projectId) throw new Error("A valid Asana project GID is required");
