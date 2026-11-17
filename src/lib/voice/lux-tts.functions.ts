@@ -1,6 +1,6 @@
 import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
-import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
+import { requireLaunchFeatureAuth } from '@/integrations/supabase/auth-middleware';
 import { writeAudit } from '@/lib/platform/audit.server';
 import { getLuxTtsCapabilities, synthesizeLuxTts } from './lux-tts.server';
 
@@ -8,7 +8,7 @@ type Sb = { from: (table: string) => any };
 const mimeType = z.enum(['audio/mpeg','audio/mp3','audio/mp4','audio/m4a','audio/wav','audio/x-wav','audio/webm','audio/ogg','audio/aac','audio/flac']);
 
 export const getLuxTtsOverview = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("communications")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const result = await sb.from('voice_clone_jobs')
@@ -21,7 +21,7 @@ export const getLuxTtsOverview = createServerFn({ method: 'POST' })
   });
 
 export const synthesizeLuxVoice = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("communications")])
   .inputValidator((input: unknown) => z.object({
     text: z.string().trim().min(1).max(4096),
     referenceAudioBase64: z.string().min(1).max(45_000_000),
