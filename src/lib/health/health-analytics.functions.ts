@@ -1,5 +1,5 @@
 import { createServerFn } from '@tanstack/react-start';
-import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
+import { requireLaunchFeatureAuth } from '@/integrations/supabase/auth-middleware';
 
 type Sb={from:(table:string)=>any};
 const DAY=86400000;
@@ -16,7 +16,7 @@ function metricTrend(rows:any[],type:string){
 }
 
 export const getHealthAnalytics=createServerFn({method:'POST'})
-.middleware([requireSupabaseAuth])
+.middleware([requireLaunchFeatureAuth("health_fitness")])
 .handler(async({context})=>{
  const sb=context.supabase as unknown as Sb;
  const since90=new Date(Date.now()-90*DAY).toISOString();
