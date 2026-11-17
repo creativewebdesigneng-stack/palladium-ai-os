@@ -11,6 +11,7 @@ import {
   addOrganisationMember, updateMemberRole, removeMember,
   listTeams, saveTeam, deleteTeam,
 } from '@/lib/platform/platform.functions';
+import { listAgents } from '@/lib/agents/agents.functions';
 
 function withOrganisationTimeout(promise, label, timeoutMs = 15000) {
   return new Promise((resolve, reject) => {
@@ -32,6 +33,7 @@ export default function Organisation() {
   const [newOrg, setNewOrg] = useState('');
   const [invite, setInvite] = useState({ email: '', role: 'member' });
   const [teamName, setTeamName] = useState('');
+  const [teamLeadAgentId, setTeamLeadAgentId] = useState('');
 
   useEffect(() => {
     if (!orgId && organisations.length) {
@@ -49,6 +51,7 @@ export default function Organisation() {
   const removeFn = useServerFn(removeMember);
   const saveTeamFn = useServerFn(saveTeam);
   const deleteTeamFn = useServerFn(deleteTeam);
+  const agentsFn = useServerFn(listAgents);
 
   const members = useQuery({
     queryKey: ['org-members', orgId],
@@ -63,6 +66,17 @@ export default function Organisation() {
     enabled: Boolean(orgId) && session === 'yes',
     retry: false,
   });
+
+  const agentsQuery = useQuery({
+    queryKey: ['org-agents', orgId],
+    queryFn: () => withOrganisationTimeout(agentsFn({ data: { limit: 200, withTasks: false } }), 'Organisation agents'),
+    enabled: Boolean(orgId) && session === 'yes',
+    retry: false,
+  });
+  const orgAgents = useMemo(
+    () => (agentsQuery.data?.agents ?? []).filter((agent) => agent.org_id === orgId || agent.org_id_fk === orgId),
+    [agentsQuery.data, orgId],
+  );
 
   const current = useMemo(() => organisations.find((o) => o.id === orgId) ?? null, [organisations, orgId]);
   const canManage = current?.role === 'owner' || current?.role === 'admin';
@@ -105,8 +119,14 @@ export default function Organisation() {
   });
 
   const addTeam = useMutation({
-    mutationFn: () => saveTeamFn({ data: { orgId, name: teamName } }),
-    onSuccess: () => { setTeamName(''); toast({ title: 'Team created' }); refreshAll(); },
+    mutationFn: () => saveTeamFn({ data: { orgId, name: teamName, leadAgentId: teamLeadAgentId || null } }),
+    onSuccess: () => { setTeamName(''); setTeamLeadAgentId(''); toast({ title: 'Team created' }); refreshAll(); },
+    onError: fail,
+  });
+
+  const assignTeamLead = useMutation({
+    mutationFn: ({ team, leadAgentId }) => saveTeamFn({ data: { id: team.id, orgId, name: team.name, description: team.description ?? '', leadAgentId: leadAgentId || null } }),
+    onSuccess: refreshAll,
     onError: fail,
   });
 
@@ -288,6 +308,18 @@ export default function Organisation() {
                       {t.name}
                       <span className="text-[10px] text-zinc-600">{t.team_members?.length ?? 0}</span>
                       {canManage && (
+                        <select
+                          aria-label={`Lead agent for ${t.name}`}
+                          value={t.lead_agent_id ?? ''}
+                          onChange={(event) => assignTeamLead.mutate({ team: t, leadAgentId: event.target.value })}
+                          disabled={assignTeamLead.isPending}
+                          className="max-w-[150px] rounded-lg border border-white/10 bg-black/40 px-2 py-1 text-[10px] text-zinc-300"
+                        >
+                          <option value="">No lead agent</option>
+                          {orgAgents.map((agent) => <option key={agent.id} value={agent.id}>{agent.name}</option>)}
+                        </select>
+                      )}
+                      {canManage && (
                         <button onClick={() => removeTeam.mutate(t.id)} className="text-zinc-500 hover:text-red-300" aria-label={`Delete ${t.name}`}>
                           <Trash2 className="h-3 w-3" />
                         </button>
@@ -296,6 +328,7 @@ export default function Organisation() {
                   ))}
                   {(teams.data ?? []).length === 0 && !teams.isLoading && <p className="text-[11px] text-zinc-600">No teams yet.</p>}
                 </div>
+                {agentsQuery.error && <p className="mt-2 text-[10px] text-rose-300">Could not load organisation agents: {agentsQuery.error.message}</p>}
                 {canManage && (
                   <div className="mt-3 flex gap-2">
                     <input
@@ -304,6 +337,10 @@ export default function Organisation() {
                       placeholder="Growth team"
                       className="min-w-0 flex-1 rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-xs text-white outline-none placeholder:text-zinc-600 focus:border-violet-400/40"
                     />
+                    <select value={teamLeadAgentId} onChange={(e) => setTeamLeadAgentId(e.target.value)} className="max-w-[160px] rounded-xl border border-white/10 bg-black/30 px-2 py-2 text-[11px] text-zinc-300">
+                      <option value="">No lead agent</option>
+                      {orgAgents.map((agent) => <option key={agent.id} value={agent.id}>{agent.name}</option>)}
+                    </select>
                     <button
                       disabled={teamName.trim().length < 2 || addTeam.isPending}
                       onClick={() => addTeam.mutate()}
