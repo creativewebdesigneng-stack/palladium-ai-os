@@ -131,7 +131,7 @@ export function validateOpportunityExecutionInput(input: unknown): OpportunityEx
  * derives tenant/actor identity server-side so clients cannot cross tenants.
  */
 export const planBlackstarOpportunityExecutionServer = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_hub")])
   .inputValidator(validateOpportunityExecutionInput)
   .handler(async ({ data, context }) => {
     const [agentsRes, workflowsRes] = await Promise.all([
