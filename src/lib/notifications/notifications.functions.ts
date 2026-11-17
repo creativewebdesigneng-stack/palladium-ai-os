@@ -6,7 +6,7 @@
  */
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
 import {
   DEFAULT_NOTIFICATION_PREFERENCES,
   NOTIFICATION_TYPE_MAP,
@@ -24,7 +24,7 @@ const prefsSchema = z.object({
 });
 
 export const getNotificationPreferences = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("notifications")])
   .handler(async ({ context }): Promise<NotificationPreferences> => {
     const sb = context.supabase as unknown as Sb;
     const { data, error } = await sb
@@ -44,7 +44,7 @@ export const getNotificationPreferences = createServerFn({ method: "POST" })
   });
 
 export const saveNotificationPreferences = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("notifications")])
   .inputValidator((input: unknown) => prefsSchema.parse(input))
   .handler(async ({ data, context }): Promise<NotificationPreferences> => {
     const sb = context.supabase as unknown as Sb;
