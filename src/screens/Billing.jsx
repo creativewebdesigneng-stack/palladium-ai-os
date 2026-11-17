@@ -23,12 +23,15 @@ import { normalizePlanCode } from '@/lib/billing/catalog';
 import { createPortalSession } from '@/utils/payments.functions';
 import SubscriptionActions from '@/components/billing/SubscriptionActions';
 import { useWorkspace } from '@/hooks/use-workspace';
+import { useLaunchAccess } from '@/lib/launch/LaunchAccessProvider';
+import { supabase } from '@/integrations/supabase/client';
 
 const CUSTOMER_TABS = ['Overview', 'Plans', 'Usage', 'Invoices', 'History', 'Compare', 'Enterprise'];
 const ADMIN_TABS = ['Overview', 'Usage', 'Invoices', 'History'];
 
 export default function Billing() {
   const { entitlements } = useWorkspace();
+  const launchAccess = useLaunchAccess();
   const isPlatformAdmin = entitlements?.isPlatformAdmin === true;
   const tabs = isPlatformAdmin ? ADMIN_TABS : CUSTOMER_TABS;
   const [tab, setTab] = useState('Overview');
@@ -45,6 +48,21 @@ export default function Billing() {
     setTab('Plans');
   };
 
+  const openFoundingPilotPortal = async () => {
+    setPortalError(null);
+    try {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      if (!token) throw new Error('Please sign in again to manage your Founding Pilot subscription.');
+      const response = await fetch('/api/launch/portal', { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
+      const result = await response.json();
+      if (!response.ok || !result.url) throw new Error(result.error ?? 'Could not open the billing portal.');
+      window.location.assign(result.url);
+    } catch (e) {
+      setPortalError(e?.message || 'Could not open the billing portal.');
+    }
+  };
+
   const openPortal = async () => {
     if (isPlatformAdmin) return;
     setPortalError(null);
@@ -57,7 +75,7 @@ export default function Billing() {
     }
   };
 
-  const headerActions = <div className="flex items-center gap-2"><div className="relative hidden sm:block"><Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-500" /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search invoices…" className="w-44 rounded-xl border border-violet-300/10 bg-black/30 py-2 pl-8 pr-3 text-xs text-zinc-300 placeholder:text-zinc-600 focus:border-violet-300/30 focus:outline-none" /></div>{isPlatformAdmin ? <span className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-400/20 bg-emerald-500/10 px-3 py-2 text-xs font-medium text-emerald-200"><ShieldCheck className="h-4 w-4" />Internal unlimited access</span> : <button onClick={() => setTab('Plans')} className="rounded-xl border border-violet-200/20 bg-violet-300 px-4 py-2 text-sm font-semibold text-[#09070d] shadow-[0_0_28px_rgba(167,139,250,.12)] transition hover:bg-violet-200">Manage plan</button>}</div>;
+  const headerActions = <div className="flex items-center gap-2"><div className="relative hidden sm:block"><Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-500" /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search invoices…" className="w-44 rounded-xl border border-violet-300/10 bg-black/30 py-2 pl-8 pr-3 text-xs text-zinc-300 placeholder:text-zinc-600 focus:border-violet-300/30 focus:outline-none" /></div>{isPlatformAdmin ? <span className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-400/20 bg-emerald-500/10 px-3 py-2 text-xs font-medium text-emerald-200"><ShieldCheck className="h-4 w-4" />Internal unlimited access</span> : <button onClick={() => setTab('Plans')} className="rounded-xl border border-violet-200/20 bg-violet-300 px-4 py-2 text-sm font-semibold text-[#09070d] shadow-[0_0_28px_rgba(167,139,250,.12)] transition hover:bg-violet-200">Manage plan</button>}{launchAccess.isPilotCustomer && <button onClick={openFoundingPilotPortal} className="rounded-xl border border-violet-300/20 px-3 py-2 text-xs font-medium text-violet-200 hover:bg-violet-400/10">Founding Pilot portal</button>}</div>;
 
   return <>
     {!isPlatformAdmin && <PaymentTestModeBanner />}
