@@ -75,7 +75,7 @@ async function probeProviderKey(provider: UserConnectableModelProvider, apiKey: 
 }
 
 export const listModelProviderConnections = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("integrations")])
   .handler(async ({ context }) => {
     const { listUserModelProviderCredentials } = await import('./model-provider-credentials.server')
     const connections = await listUserModelProviderCredentials(context.userId)
@@ -104,7 +104,7 @@ export const listModelProviderConnections = createServerFn({ method: 'POST' })
   })
 
 export const saveModelProviderConnection = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("integrations")])
   .inputValidator((input: unknown) => saveSchema.parse(input))
   .handler(async ({ data, context }) => {
     if (data.provider === 'nvidia' && !nvidiaPersonalCredentialsEnabled()) {
@@ -131,7 +131,7 @@ export const saveModelProviderConnection = createServerFn({ method: 'POST' })
   })
 
 export const testModelProviderConnection = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("integrations")])
   .inputValidator((input: unknown) => z.object({ provider: providerSchema }).parse(input))
   .handler(async ({ data, context }) => {
     if (data.provider === 'nvidia' && !nvidiaPersonalCredentialsEnabled()) {
@@ -145,7 +145,7 @@ export const testModelProviderConnection = createServerFn({ method: 'POST' })
   })
 
 export const deleteModelProviderConnection = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("integrations")])
   .inputValidator((input: unknown) => z.object({ provider: providerSchema }).parse(input))
   .handler(async ({ data, context }) => {
     if (data.provider === 'nvidia' && !nvidiaPersonalCredentialsEnabled()) {
@@ -170,7 +170,7 @@ export const deleteModelProviderConnection = createServerFn({ method: 'POST' })
  * the existing pinned NVIDIA gateway + required mission audit infrastructure.
  */
 export const testPersonalNvidiaModelInference = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("integrations")])
   .handler(async ({ context }) => {
     const { certifyPersonalNvidiaInference } = await import('./nvidia-inference-certification.server')
     return certifyPersonalNvidiaInference({ userId: context.userId })
