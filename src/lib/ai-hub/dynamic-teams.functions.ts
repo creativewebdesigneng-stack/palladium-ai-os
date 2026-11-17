@@ -23,7 +23,7 @@ const inputSchema = z.object({
 
 export { buildDynamicTeamCandidates }
 export const planDynamicAgentTeam = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_hub")])
   .inputValidator((input: unknown) => inputSchema.parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb
