@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { readGoogleDriveFile, searchGoogleDriveFiles } from "./google-workspace.server";
 import { readMicrosoftOneDriveFile, searchMicrosoftOneDriveFiles } from "./microsoft365.server";
 
@@ -25,7 +25,7 @@ async function resolveFileProvider(sb: Sb, userId: string, requested?: string | 
 }
 
 export const searchConnectedWorkspaceFiles = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("integrations")])
   .inputValidator((input: { query: string; provider?: FileProvider; limit?: number }) => {
     const query = String(input?.query ?? "").trim().slice(0, 200);
     if (!query) throw new Error("A file search query is required");
@@ -45,7 +45,7 @@ export const searchConnectedWorkspaceFiles = createServerFn({ method: "POST" })
   });
 
 export const readConnectedWorkspaceFile = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("integrations")])
   .inputValidator((input: { fileId: string; provider?: FileProvider; mimeType?: string | null }) => {
     const fileId = String(input?.fileId ?? "").trim().slice(0, 300);
     if (!fileId) throw new Error("A file id is required");
