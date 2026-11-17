@@ -45,6 +45,7 @@ export const FEATURE_REGISTRY = {
   projects: { label: "Projects, tasks and teams", route: "/projects", defaultStatus: "hidden" },
   notifications: { label: "Notifications and support", route: "/notifications", defaultStatus: "beta" },
   settings: { label: "Settings and organisation", route: "/settings", defaultStatus: "beta" },
+  health_fitness: { label: "Health and fitness", route: "/health-fitness", defaultStatus: "hidden" },
 } as const satisfies Record<string, { label: string; route: string; defaultStatus: FeatureStatus }>;
 
 export type FeatureId = keyof typeof FEATURE_REGISTRY;
