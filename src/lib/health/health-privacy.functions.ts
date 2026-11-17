@@ -1,6 +1,6 @@
 import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
-import { requireLaunchFeatureAuth } from '@/integrations/supabase/auth-middleware';
+import { requireLaunchFeatureAuth } from '@/lib/launch/launch-auth-middleware';
 import { writeAudit } from '@/lib/platform/audit.server';
 type Sb={from:(table:string)=>any};
 const TABLES=['health_profiles','health_goals','health_metric_entries','health_workouts','health_nutrition_entries','health_sleep_entries','health_medications','health_plans','health_records','health_import_batches','health_appointment_briefs','health_reminders'] as const;
