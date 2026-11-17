@@ -28,7 +28,11 @@ export default function AgentMarketplace() {
   const [query, setQuery] = useState('');
   const [view, setView] = useState('discover');
   const [active, setActive] = useState(null);
-  const [agents, setAgents] = useState([]);\n  const [session, setSession] = useState('unknown');\n  const [loading, setLoading] = useState(true);\n  const [loadError, setLoadError] = useState('');\n  const [reload, setReload] = useState(0);
+  const [agents, setAgents] = useState([]);
+  const [session, setSession] = useState('unknown');
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [reload, setReload] = useState(0);
 
   // Published listings come from the authenticated marketplace API — real records only.
   useEffect(() => {
