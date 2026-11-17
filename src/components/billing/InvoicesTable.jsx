@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { FileText, Loader2, ReceiptText } from 'lucide-react';
+import { FileText, Loader2, ReceiptText, RefreshCw } from 'lucide-react';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { listBillingEvents } from '@/lib/billing/billing.functions';
 import { StatusBadge } from './shared';
@@ -10,19 +10,35 @@ export default function InvoicesTable() {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [retry, setRetry] = useState(0);
 
   useEffect(() => {
-    if (session !== 'yes') return;
     let cancelled = false;
+    if (session !== 'yes') {
+      setEvents([]);
+      setError(session === 'no' ? 'Sign in to view billing records.' : null);
+      setLoading(session === 'unknown');
+      return () => { cancelled = true; };
+    }
+
+    setLoading(true);
+    setError(null);
     listBillingEvents({ data: { orgId: activeOrgId } })
-      .then((res) => { if (!cancelled) setEvents(res.events.filter((e) => e.kind !== 'subscription')); })
-      .catch((e) => { console.error('[billing]', e); if (!cancelled) setError('Could not load billing history.'); })
+      .then((res) => {
+        if (cancelled) return;
+        if (!Array.isArray(res?.events)) throw new Error('Billing history returned an invalid response.');
+        setEvents(res.events.filter((event) => event.kind !== 'subscription'));
+      })
+      .catch((e) => {
+        console.error('[billing]', e);
+        if (!cancelled) setError('Could not load billing history. Check your connection and try again.');
+      })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [session, activeOrgId]);
+  }, [session, activeOrgId, retry]);
 
-  if (loading) return <div className="flex items-center gap-2 p-6 text-xs text-zinc-500"><Loader2 className="h-3.5 w-3.5 animate-spin" />Loading…</div>;
-  if (error) return <p className="p-4 text-xs text-rose-300">{error}</p>;
+  if (loading) return <div role="status" className="flex items-center gap-2 p-6 text-xs text-zinc-500"><Loader2 className="h-3.5 w-3.5 animate-spin" />{session === 'unknown' ? 'Checking your session…' : 'Loading invoices…'}</div>;
+  if (error) return <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-rose-400/20 bg-rose-500/[.06] p-4 text-xs text-rose-200"><span>{error}</span>{session === 'yes' && <button onClick={() => setRetry((value) => value + 1)} className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-2 text-zinc-200 hover:bg-white/5"><RefreshCw className="h-3.5 w-3.5" />Retry</button>}</div>;
 
   if (events.length === 0) {
     return (
@@ -48,9 +64,7 @@ export default function InvoicesTable() {
         <tbody className="divide-y divide-white/5">
           {events.map((inv) => (
             <tr key={inv.id} className="text-zinc-300 hover:bg-white/[.02]">
-              <td className="px-4 py-2.5">
-                <span className="flex items-center gap-2"><FileText className="h-3.5 w-3.5 text-zinc-500" /><span className="text-xs">{inv.title}</span></span>
-              </td>
+              <td className="px-4 py-2.5"><span className="flex items-center gap-2"><FileText className="h-3.5 w-3.5 text-zinc-500" /><span className="text-xs">{inv.title}</span></span></td>
               <td className="px-4 py-2.5 text-xs text-zinc-400">{new Date(inv.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</td>
               <td className="px-4 py-2.5 text-white">{inv.amount != null ? `£${inv.amount.toFixed(2)}` : '—'}</td>
               <td className="px-4 py-2.5"><StatusBadge status={inv.status} /></td>
