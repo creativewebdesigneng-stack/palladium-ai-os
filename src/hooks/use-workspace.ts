@@ -12,6 +12,13 @@ import { getWorkspace } from "@/lib/platform/platform.functions";
 
 const ACTIVE_ORG_KEY = "palladium.activeOrg";
 
+function withWorkspaceTimeout<T>(promise: Promise<T>, timeoutMs = 15000): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("Workspace state did not respond within 15 seconds.")), timeoutMs);
+    Promise.resolve(promise).then(resolve, reject).finally(() => clearTimeout(timer));
+  });
+}
+
 export function useSession() {
   const [state, setState] = useState<"unknown" | "yes" | "no">("unknown");
   useEffect(() => {
@@ -50,7 +57,7 @@ export function useWorkspace() {
 
   const query = useQuery({
     queryKey: ["workspace", orgId],
-    queryFn: () => workspaceFn({ data: { orgId } }),
+    queryFn: () => withWorkspaceTimeout(workspaceFn({ data: { orgId } })),
     enabled: session === "yes",
     retry: false,
     staleTime: 30_000,
