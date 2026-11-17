@@ -1,5 +1,5 @@
 import { createServerFn } from '@tanstack/react-start';
-import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
+import { requireLaunchFeatureAuth } from '@/integrations/supabase/auth-middleware';
 import { prepareAgentSkillPackage } from './skill-package';
 import { INTEGRATION_PLAYBOOKS } from './builtin-integration-playbooks';
 import { writeAudit } from '@/lib/platform/audit.server';
@@ -7,7 +7,7 @@ import { writeAudit } from '@/lib/platform/audit.server';
 type Sb = { from: (table: string) => any };
 
 export const installIntegrationPlaybookPack = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("integrations")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const installed: Array<{ id: string; name: string; scan_verdict: string; enabled: boolean }> = [];
