@@ -29,7 +29,7 @@ export const getBillingOverview = createServerFn({ method: "POST" })
     const base = sb
       .from("subscriptions")
       .select(
-        "plan_code,status,seats,current_period_start,current_period_end,cancel_at_period_end,trial_ends_at,environment,created_at,updated_at",
+        "plan_code,status,seats,current_period_start,current_period_end,cancel_at_period_end,trial_ends_at,created_at,updated_at",
       );
     const { data: sub, error } = orgId
       ? await base.eq("org_id", orgId).maybeSingle()
@@ -51,7 +51,7 @@ export const listBillingEvents = createServerFn({ method: "POST" })
 
     const subQuery = sb
       .from("subscriptions")
-      .select("plan_code,status,created_at,updated_at,cancel_at_period_end,environment");
+      .select("plan_code,status,created_at,updated_at,cancel_at_period_end");
     const purchasesQuery = sb
       .from("marketplace_orders")
       .select("id,sale_price_pence,currency,status,created_at")
