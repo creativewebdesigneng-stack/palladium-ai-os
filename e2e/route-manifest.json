@@ -175,6 +175,11 @@
       "path": "/retail-hub",
       "file": "src/routes/_shell/_app/retail-hub.tsx",
       "marker": "Retail & Local Business Hub — Blackstar"
+    },
+    {
+      "path": "/mcp-hub",
+      "file": "src/routes/_shell/_app/mcp-hub.tsx",
+      "marker": "MCP hub — Blackstar"
     }
   ],
   "signedOutRedirects": [
