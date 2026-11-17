@@ -1,5 +1,5 @@
 import { createServerFn } from '@tanstack/react-start';
-import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
+import { requireLaunchFeatureAuth } from '@/integrations/supabase/auth-middleware';
 import {
   retailReceptionistInquirySchema,
   runRetailReceptionistCore,
@@ -11,7 +11,7 @@ type Sb = {
 };
 
 export const runRetailReceptionistInquiry = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("communications")])
   .inputValidator((value: unknown) => retailReceptionistInquirySchema.parse(value))
   .handler(async ({ data, context }) => {
     return runRetailReceptionistCore({
