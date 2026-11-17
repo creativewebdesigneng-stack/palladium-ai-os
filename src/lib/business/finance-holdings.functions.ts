@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 type Sb={from:(t:string)=>any};
 const holding=z.object({id:z.string().uuid().optional(),symbol:z.string().trim().min(1).max(32),name:z.string().trim().max(120).optional(),asset_type:z.enum(["stock","etf","fund","bond","cash","crypto","property","pension","other"]).default("other"),quantity:z.coerce.number().min(0).max(1e12),cost_basis:z.coerce.number().min(0).max(1e15).optional(),manual_value:z.coerce.number().min(0).max(1e15).optional(),currency:z.string().trim().length(3).default("GBP"),notes:z.string().trim().max(1000).optional()});
 export const listFinanceHoldings=createServerFn({method:"POST"}).middleware([requireLaunchFeatureAuth("finance")]).handler(async({context})=>{const sb=context.supabase as unknown as Sb;const {data,error}=await sb.from("finance_holdings").select("*").order("created_at",{ascending:false});if(error)throw new Error(error.message);return data??[];});
