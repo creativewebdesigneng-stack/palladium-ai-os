@@ -8,7 +8,7 @@
  */
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
 import { INTEGRATION_PROVIDERS, findProvider } from "./providers";
 import { capabilityProfile } from "./capability-catalog";
 import { resolveProviderTargetMatch } from "./provider-target-routing";
@@ -31,7 +31,7 @@ const pageConnectorStateInput = z.object({
 });
 
 export const listIntegrations = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("integrations")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const { data: rows, error } = await sb
@@ -79,7 +79,7 @@ export const listIntegrations = createServerFn({ method: "POST" })
   });
 
 export const getPageConnectorConnectionState = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("integrations")])
   .inputValidator((input: unknown) => pageConnectorStateInput.parse(input))
   .handler(async ({ data, context }) => {
     const providerIds = Array.from(
@@ -243,7 +243,7 @@ export const getPageConnectorConnectionState = createServerFn({ method: "POST" }
   });
 
 export const testIntegrationConnection = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("integrations")])
   .inputValidator((input: unknown) => providerInput.pick({ provider: true }).parse(input))
   .handler(async ({ data, context }) => {
     const providerId = data.provider.trim().toLowerCase();
@@ -360,7 +360,7 @@ export const testIntegrationConnection = createServerFn({ method: "POST" })
   });
 
 export const startIntegrationOAuth = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("integrations")])
   .inputValidator((input: unknown) => startInput.parse(input))
   .handler(async ({ data, context }) => {
     const provider = findProvider(data.provider);
@@ -388,7 +388,7 @@ export const startIntegrationOAuth = createServerFn({ method: "POST" })
   });
 
 export const disconnectIntegration = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("integrations")])
   .inputValidator((input: unknown) => providerInput.parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
