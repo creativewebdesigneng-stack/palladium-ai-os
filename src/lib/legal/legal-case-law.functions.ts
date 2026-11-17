@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
 import { searchPublicWeb, type WebSource } from "@/lib/ai/web-access.server";
 import { runChat } from "@/lib/runtime/model-gateway.server";
 import { resolveAssistantModelPreference } from "@/lib/ai/ai-preferences.server";
@@ -57,7 +57,7 @@ async function searchOfficialCaseLaw(
 }
 
 export const runCaseLawIntelligence = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("security")])
   .inputValidator((value: unknown) => input.parse(value))
   .handler(async ({ data, context }) => {
     const profile = getCaseLawProfile(data.jurisdiction);
