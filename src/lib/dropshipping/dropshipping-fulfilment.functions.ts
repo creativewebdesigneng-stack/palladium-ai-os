@@ -42,7 +42,7 @@ async function loadOwnedDropshipOrder(sb:Sb,userId:string,input:{workspace_id:st
 }
 
 export const getDropshippingFulfilmentCapabilities=createServerFn({method:'POST'})
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("commerce")])
   .handler(async({context})=>{
     const capabilities=await listIntegrationCapabilities(context.userId);
     return buildFulfilmentCapabilityRows(capabilities as any).map(row=>({
@@ -60,7 +60,7 @@ export const getDropshippingFulfilmentCapabilities=createServerFn({method:'POST'
   });
 
 export const queueDropshippingFulfilmentApproval=createServerFn({method:'POST'})
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("commerce")])
   .inputValidator((value:unknown)=>z.object({
     workspace_id:uuid,
     order_id:uuid,
