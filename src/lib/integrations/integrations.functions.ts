@@ -8,7 +8,7 @@
  */
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { INTEGRATION_PROVIDERS, findProvider } from "./providers";
 import { capabilityProfile } from "./capability-catalog";
 import { resolveProviderTargetMatch } from "./provider-target-routing";
