@@ -13,12 +13,12 @@
  */
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
 
 type Sb = { from: (t: string) => any };
 
 export const getBillingOverview = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("billing")])
   .inputValidator((input: unknown) =>
     z.object({ orgId: z.string().uuid().nullish() }).parse(input ?? {}),
   )
@@ -40,7 +40,7 @@ export const getBillingOverview = createServerFn({ method: "POST" })
   });
 
 export const listBillingEvents = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("billing")])
   .inputValidator((input: unknown) =>
     z.object({ orgId: z.string().uuid().nullish() }).parse(input ?? {}),
   )
@@ -121,7 +121,7 @@ export const listBillingEvents = createServerFn({ method: "POST" })
   });
 
 export const updateMyProfile = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("billing")])
   .inputValidator((input: unknown) =>
     z
       .object({
