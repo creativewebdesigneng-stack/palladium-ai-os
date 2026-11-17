@@ -54,4 +54,16 @@ describe("investor-facing route acceptance manifest", () => {
     expect(new Set(paths).size).toBe(paths.length);
   });
 
+
+  it("tests the human-facing MCP Hub while keeping the protocol endpoint protected", () => {
+    const hub = manifest.protectedShells.find((entry) => entry.path === "/mcp-hub");
+    expect(hub).toMatchObject({
+      file: "src/routes/_shell/_app/mcp-hub.tsx",
+      marker: "MCP hub — Blackstar",
+    });
+    expect(existsSync(new URL("../../../src/routes/_shell/_app/mcp-hub.tsx", import.meta.url))).toBe(true);
+    const route = readFileSync(new URL("../../../src/routes/_shell/_app/mcp-hub.tsx", import.meta.url), "utf8");
+    expect(route).toContain("OAuth-protected MCP server");
+  });
+
 });
