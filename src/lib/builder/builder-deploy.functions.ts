@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { createVercelPreviewDeployment, getVercelDeployment, promoteVercelDeployment } from "./builder-deploy-vercel.server";
 import {writeAuditRequired} from '@/lib/platform/audit.server';
 
