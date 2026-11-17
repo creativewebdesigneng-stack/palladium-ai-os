@@ -1,5 +1,5 @@
 import { createServerFn } from '@tanstack/react-start';
-import { requireLaunchFeatureAuth } from '@/integrations/supabase/auth-middleware';
+import { requireLaunchFeatureAuth } from '@/lib/launch/launch-auth-middleware';
 import { prepareAgentSkillPackage } from './skill-package';
 import { INTEGRATION_PLAYBOOKS } from './builtin-integration-playbooks';
 import { writeAudit } from '@/lib/platform/audit.server';
