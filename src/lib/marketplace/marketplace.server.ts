@@ -85,9 +85,24 @@ export async function withCreators(sb: { from: (t: string) => any }, rows: Row[]
 
 /** True when the caller holds the platform `admin` role. */
 export async function isPlatformAdmin(
-  sb: { rpc: (fn: string, args?: Record<string, unknown>) => any },
+  sb: {
+    rpc: (fn: string, args?: Record<string, unknown>) => any;
+    from: (table: string) => any;
+  },
   userId: string,
 ) {
+  const configuredAdminEmail = process.env["BLACKSTAR_ADMIN_EMAIL"]?.trim().toLowerCase();
+  if (configuredAdminEmail) {
+    const { data: profile, error: profileError } = await sb
+      .from("profiles")
+      .select("email")
+      .eq("id", userId)
+      .maybeSingle();
+    if (!profileError && typeof profile?.email === "string" &&
+      profile.email.trim().toLowerCase() === configuredAdminEmail) {
+      return true;
+    }
+  }
   const { data, error } = await sb.rpc("has_role", { _user_id: userId, _role: "admin" });
   return !error && data === true;
 }
