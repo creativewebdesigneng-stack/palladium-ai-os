@@ -17,6 +17,21 @@ The existing product is a TanStack Start / React / TypeScript application. Astra
 
 The browser must never connect directly to Ollama or receive the bearer token.
 
+### Existing Blackstar implementation to extend
+
+The repository already contains the production model gateway at `src/lib/runtime/model-gateway.server.ts` and its transport/provider implementation at `src/lib/runtime/model-gateway.base.ts`. The compatible provider reads `OPENAI_COMPATIBLE_BASE_URL` and optional `OPENAI_COMPATIBLE_API_KEY` server-side. The Windows bearer proxy itself reads `BLACKSTAR_BRIDGE_TOKEN`; the cloud bridge setup prints the matching value as `OPENAI_COMPATIBLE_API_KEY` for the Blackstar server deployment.
+
+Important routing distinction: `runChatPinned` is the exact-provider/model path used by evaluation and certification; it avoids cross-provider and alternate-model failover. The general `runChat` path has a configured-provider fallback order and can call external/metered providers. Astra X's local-only benchmark and any zero-spend execution must use an explicitly pinned compatible model path and enforce its own local-provider policy. Do not assume `BLACKSTAR_NATIVE_PRIMARY=true` alone prevents fallback in the general gateway.
+
+Blackstar also already contains:
+- AI Hub workload contracts, discovery, deterministic routing, orchestration, provider registry and approval-gated execution under `src/lib/ai-hub/`;
+- native adapter registration for the model gateway, agent runtime, MCP, skills and workflows;
+- agent planning/orchestration/trust code under `src/lib/agents/`;
+- scoped memory retrieval and context policy under `src/lib/memory/`;
+- Astra certification/evaluation suites under `src/lib/evals/` and `src/lib/ai/`.
+
+Astra X should register a capability and use the existing AI Hub execution boundary and approval gate, then call the pinned server-side model gateway where a text-generation operation is required. It must not create a parallel model gateway, approval queue, memory fabric or agent runtime. The existing research package's plan validator is a local testable policy primitive, not a replacement for the server-side AI Hub gateway.
+
 ### Existing local runtime to preserve
 
 Previously recorded Blackstar setup:
