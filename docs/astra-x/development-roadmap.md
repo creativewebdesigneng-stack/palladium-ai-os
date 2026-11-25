@@ -53,10 +53,10 @@ Current implementation status is intentionally conservative: checked items below
 **Gate:** sandboxed test mission completes with traceable evidence and no unapproved side effects.
 
 ### A5. Project memory
-- [ ] Define scoped memory record and provenance schema.
-- [ ] Add retrieval, expiry, correction and deletion semantics.
-- [ ] Add stale/conflict handling and access controls.
-- [ ] Test user/project memory isolation.
+- [x] Reuse Blackstar's existing scoped Memory Fabric records and provenance schema.
+- [x] Integrate user-scoped retrieval and existing expiry/correction/deletion semantics through Memory Fabric.
+- [ ] Add explicit stale/conflict comparison and additional project/org isolation coverage.
+- [x] Test preference-gated user-memory recall and fail-closed behaviour for Astra X.
 
 **Gate:** retrieval and isolation tests pass.
 
