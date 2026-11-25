@@ -12,7 +12,7 @@ This directory is an **isolated research package**. It does not replace the exis
 - Local-only OpenAI-compatible chat adapter with loopback URL validation.
 - Redirect blocking and bounded response size.
 - Read-only Windows hardware/Ollama inventory script.
-- Bounded agent-plan validation with tool allowlists, argument schemas and approval gates.\n- Unit tests for routing, spend guardrails, agent policy and endpoint restrictions.
+- Bounded agent-plan validation with tool allowlists, argument schemas and approval gates.\n- Recomp Lab job/result contracts with provenance hashes, resource limits, operation-specific permissions and verification evidence.\n- Unit tests for routing, spend guardrails, agent policy and endpoint restrictions.
 
 The adapter is intended for a local Astra X process communicating with the existing authenticated local Blackstar provider proxy. The browser must never call Ollama directly. Provider credentials are injected by a trusted server-side process and must never be committed or exposed to client code.
 
@@ -51,6 +51,10 @@ Requires Python 3.11 or newer.
 
     python -m pip install -e ".[dev]"
     python -m pytest
+
+## Recomp Lab contract
+
+The `astra_x.recomp_lab` module defines strict job and result envelopes for authorised research inputs. It validates artifact SHA-256 hashes, provenance, authorisation records, operation-specific capabilities, bounded CPU/memory/time/output limits, approval state, result linkage and verification evidence. It does not inspect or execute binaries; actual analysis tools must remain separately sandboxed and reviewed.
 
 ## Agent plan safety contract
 
