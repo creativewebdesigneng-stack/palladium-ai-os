@@ -67,3 +67,36 @@ def test_request_limits_are_validated_before_network_access() -> None:
         provider.chat([{"role": "user", "content": "hello"}], max_tokens=9000)
     with pytest.raises(ValueError):
         provider.chat([{"role": "system", "content": "hello"}], temperature=2.1)
+
+
+
+def test_non_finite_timeout_is_rejected():
+    with pytest.raises(ProviderConfigurationError):
+        LocalOpenAICompatibleProvider(
+            base_url="http://127.0.0.1:8080/v1",
+            model="local",
+            bearer_token="token",
+            timeout_seconds=float("nan"),
+        )
+
+
+def test_bearer_token_line_breaks_are_rejected():
+    with pytest.raises(ProviderConfigurationError):
+        LocalOpenAICompatibleProvider(
+            base_url="http://127.0.0.1:8080/v1",
+            model="local",
+            bearer_token="token\\nforged",
+        )
+
+
+def test_non_finite_temperature_is_rejected():
+    provider = LocalOpenAICompatibleProvider(
+        base_url="http://127.0.0.1:8080/v1",
+        model="local",
+        bearer_token="token",
+    )
+    with pytest.raises(ValueError, match="finite"):
+        provider.chat(
+            [{"role": "user", "content": "hello"}],
+            temperature=float("nan"),
+        )
