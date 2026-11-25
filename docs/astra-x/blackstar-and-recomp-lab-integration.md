@@ -32,7 +32,9 @@ Blackstar also already contains:
 
 A server-only bridge now exists at `src/lib/ai/astra-x-runtime.server.ts`. It validates the existing native runtime flag/model/endpoint settings, requires HTTPS plus a server bearer key for non-loopback endpoints, bounds text requests, disables tools and calls `runChatPinned` only. It deliberately does not claim endpoint reachability or prove that a remote tunnel terminates on the owner's workstation.
 
-The next integration step is to register an Astra X capability and adapter with the existing AI Hub execution boundary and approval gate, then expose it only through an authenticated server route. It must not create a parallel model gateway, approval queue, memory fabric or agent runtime. The existing research package's plan validator is a local testable policy primitive, not a replacement for the server-side AI Hub gateway.
+An authenticated server entry point now exists at `src/lib/ai/astra-x.functions.ts`. It uses the existing Supabase auth middleware and AI Hub execution gateway, and is disabled unless `ASTRA_X_ENABLED=true`. It routes text-only requests through the pinned compatible model bridge with no tools or cross-provider fallback. It does not yet add a new UI surface or memory retrieval.
+
+It must not create a parallel model gateway, approval queue, memory fabric or agent runtime. The existing research package's plan validator is a local testable policy primitive, not a replacement for the server-side AI Hub gateway.
 
 ### Existing local runtime to preserve
 
