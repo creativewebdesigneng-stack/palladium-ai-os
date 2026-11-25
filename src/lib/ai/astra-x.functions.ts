@@ -130,7 +130,9 @@ export const runAstraXTask = createServerFn({ method: 'POST' })
       query: data.messages[data.messages.length - 1]?.content ?? '',
     })
     const plan = createAstraXPlan(taskId, runtime.model)
-    const gateway = new AiHubExecutionGateway(createPalladiumAiHubRegistry())
+    const registry = createPalladiumAiHubRegistry()
+    registry.registerCapability(plan.route.capability)
+    const gateway = new AiHubExecutionGateway(registry)
 
     gateway.registerAdapter('model-gateway', async (_plan, executionContext) => {
       const request = executionContext.input as AstraXNativeChatRequest
