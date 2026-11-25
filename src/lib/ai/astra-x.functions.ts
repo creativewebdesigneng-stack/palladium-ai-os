@@ -148,8 +148,20 @@ export const runAstraXTask = createServerFn({ method: 'POST' })
       input: data,
     })
 
-    if (result.status !== 'completed') {
+    if (result.status !== 'completed' || !result.output || typeof result.output !== 'object') {
       throw new Error(result.error ?? 'Astra X task did not complete.')
     }
-    return result.output
+    const output = result.output as Record<string, unknown>
+    const usage = output['usage'] as Record<string, unknown> | undefined
+    if (typeof output['text'] !== 'string' || output['provider'] !== 'compatible' ||
+        typeof output['model'] !== 'string' ||
+        typeof usage?.['input'] !== 'number' || typeof usage?.['output'] !== 'number') {
+      throw new Error('Astra X gateway returned an invalid response envelope.')
+    }
+    return {
+      text: output['text'],
+      provider: 'compatible' as const,
+      model: output['model'],
+      usage: { input: usage['input'], output: usage['output'] },
+    }
   })
