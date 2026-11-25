@@ -14,7 +14,8 @@ This directory is an **isolated research package**. It does not replace the exis
 - Read-only Windows hardware/Ollama inventory script.
 - Bounded agent-plan validation with tool allowlists, argument schemas and approval gates.
 - Recomp Lab job/result contracts with provenance hashes, resource limits, operation-specific permissions and verification evidence.
-- Reproducible model experiment and artifact manifest contracts with weight/data hashes, licence metadata, Git revisions and local-compute policy.\n- Blackstar Memory Fabric integration using user-scoped recall and stored memory preferences; retrieval failures fail closed and recalled content is labelled untrusted.
+- Reproducible model experiment and artifact manifest contracts with weight/data hashes, licence metadata, Git revisions and local-compute policy.
+- Blackstar Memory Fabric integration using user-scoped recall and stored memory preferences; retrieval failures fail closed and recalled content is labelled untrusted.
 - Unit tests for routing, spend guardrails, agent policy and endpoint restrictions.
 
 The research adapter is intended for a local Astra X process communicating with the existing authenticated local Blackstar provider proxy. The optional Blackstar AI Hub entry point is feature-flagged by server-side ASTRA_X_ENABLED (off unless explicitly set). The browser must never call Ollama directly. Provider credentials are injected by a trusted server-side process and must never be committed or exposed to client code.
