@@ -134,12 +134,15 @@ def validate_job_for_execution(job: RecompLabJob) -> tuple[str, ...]:
     errors: list[str] = []
     if job.approval != ApprovalState.APPROVED:
         errors.append("Recomp Lab job has not received explicit approval.")
-    if job.operation in {RecompOperation.DISASSEMBLE, RecompOperation.TRANSLATE_SUBSET} and "binary_analysis" not in job.allowed_capabilities:
-        errors.append("Binary analysis capability is not explicitly authorised.")
-    if job.operation == RecompOperation.VALIDATE_SHADER and "shader_validation" not in job.allowed_capabilities:
-        errors.append("Shader validation capability is not explicitly authorised.")
-    if job.operation == RecompOperation.COMPARE_OUTPUT and "output_comparison" not in job.allowed_capabilities:
-        errors.append("Output comparison capability is not explicitly authorised.")
+    required_capability = {
+        RecompOperation.INSPECT: "metadata_inspection",
+        RecompOperation.DISASSEMBLE: "binary_analysis",
+        RecompOperation.TRANSLATE_SUBSET: "binary_analysis",
+        RecompOperation.VALIDATE_SHADER: "shader_validation",
+        RecompOperation.COMPARE_OUTPUT: "output_comparison",
+    }[job.operation]
+    if required_capability not in job.allowed_capabilities:
+        errors.append(f"Operation requires explicit {required_capability} capability.")
     return tuple(errors)
 
 
