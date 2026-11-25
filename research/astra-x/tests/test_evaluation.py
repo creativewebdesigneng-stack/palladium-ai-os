@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 from dataclasses import dataclass
 
 import pytest
@@ -91,3 +92,16 @@ def test_load_cases_rejects_invalid_schema(tmp_path, line):
     dataset.write_text(line + "\\n", encoding="utf-8")
     with pytest.raises(ValueError, match="line 1"):
         load_cases(dataset)
+
+
+
+def test_bundled_baseline_dataset_is_loadable():
+    dataset = Path(__file__).parents[1] / "benchmarks" / "baseline-v0.1.jsonl"
+    cases = load_cases(dataset)
+    assert len(cases) == 6
+    assert {case.category for case in cases} >= {
+        "reasoning",
+        "coding",
+        "research",
+        "instruction_following",
+    }
