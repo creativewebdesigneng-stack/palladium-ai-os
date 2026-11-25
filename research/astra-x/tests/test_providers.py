@@ -42,6 +42,16 @@ def test_model_id_is_required() -> None:
         LocalOpenAICompatibleProvider(
             base_url="http://127.0.0.1:8080/v1",
             model=" ",
+            bearer_token="test-token",
+        )
+
+
+def test_authenticated_proxy_token_is_required() -> None:
+    with pytest.raises(ProviderConfigurationError):
+        LocalOpenAICompatibleProvider(
+            base_url="http://127.0.0.1:8080/v1",
+            model="qwen3:8b-q4_K_M",
+            bearer_token=" ",
         )
 
 
@@ -49,6 +59,7 @@ def test_request_limits_are_validated_before_network_access() -> None:
     provider = LocalOpenAICompatibleProvider(
         base_url="http://127.0.0.1:8080/v1",
         model="qwen3:8b-q4_K_M",
+        bearer_token="test-token",
     )
     with pytest.raises(ValueError):
         provider.chat([], max_tokens=100)
