@@ -4,6 +4,8 @@
 
 ## Workstream A — Platform and runtime
 
+Current implementation status is intentionally conservative: checked items below exist in the isolated research package and have dedicated tests. They are not yet wired into Blackstar production routes, verified against the owner's live Ollama proxy, or production-enabled.
+
 ### A0. Inventory and baseline
 - [ ] Map existing Astra routes, provider gateway and local runtime configuration.
 - [ ] Confirm current Ollama version, model list, driver version and GPU detection on the owner's PC.
@@ -13,35 +15,35 @@
 **Gate:** evidence-backed architecture map and reproducible baseline report.
 
 ### A1. Provider contract and local adapter
-- [ ] Define model provider interface and health/capability metadata.
-- [ ] Implement a local-only OpenAI-compatible adapter.
-- [ ] Enforce loopback-only URLs in the local adapter.
-- [ ] Add timeouts, bounded request sizes, schema validation and safe error handling.
-- [ ] Test that remote hosts are rejected.
+- [x] Define provider capability descriptors and a local chat adapter interface (health reporting remains open).
+- [x] Implement a local-only OpenAI-compatible adapter.
+- [x] Enforce loopback-only URLs in the local adapter.
+- [x] Add timeouts, bounded response sizes, message validation and safe error handling.
+- [x] Test that remote hosts are rejected and redirects are blocked.
 - [ ] Integrate only through the existing authenticated server-side gateway.
 
 **Gate:** local mock-server tests pass; owner-device integration test recorded separately.
 
 ### A2. Routing, task envelopes and traces
 - [ ] Add task envelope schemas and deterministic routing policy.
-- [ ] Enforce local-only and zero-spend defaults.
+- [x] Enforce local-only and zero-spend defaults in the research router.
 - [ ] Record model identity, policy decision, trace ID and latency.
 - [ ] Add context budget and truncation detection.
 
 **Gate:** no remote provider selected under default policy; routing tests pass.
 
 ### A3. Evaluation harness
-- [ ] Create versioned reasoning, coding, research and tool-use task sets.
+- [x] Create a versioned starter dataset for reasoning, coding knowledge, research uncertainty and instruction following (full tool-use set remains open).
 - [ ] Store prompt, expected outcome, rubric and source provenance.
-- [ ] Add deterministic scoring where possible and human review for subjective tasks.
+- [x] Add deterministic smoke scoring; human review and richer rubrics remain open.
 - [ ] Track pass rate, regression, latency, VRAM and failure categories.
 
 **Gate:** repeatable baseline report for the current Qwen3 8B quantised model.
 
 ### A4. Agent runtime
 - [ ] Implement planner/executor/verifier separation.
-- [ ] Define typed tool registry and permission checks.
-- [ ] Add approval queue for side effects.
+- [x] Define typed tool descriptors, argument allowlists and plan permission checks (runtime registry integration remains open).
+- [x] Add plan validation that flags side-effecting actions for explicit approval (UI approval queue remains open).
 - [ ] Bound retries, context, tokens, wall time and tool calls.
 - [ ] Add prompt-injection and untrusted-content tests.
 
