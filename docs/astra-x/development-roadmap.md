@@ -27,8 +27,9 @@ Current implementation status is intentionally conservative: checked items below
 **Gate:** local mock-server tests pass; owner-device integration test recorded separately.
 
 ### A2. Routing, task envelopes and traces
-- [ ] Add typed task envelope schemas and trace propagation.
+- [x] Add typed task envelope schema with tenant/actor identity, trace ID and bounded token/step budgets.
 - [x] Add deterministic routing policy and enforce local-only, zero-spend defaults in the research router.
+- [ ] Propagate trace IDs through all Blackstar execution, model and memory logs.
 - [ ] Record model identity, policy decision, trace ID and latency.
 - [ ] Add context budget and truncation detection.
 
