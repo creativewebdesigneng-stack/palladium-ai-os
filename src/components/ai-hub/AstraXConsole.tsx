@@ -59,7 +59,6 @@ export default function AstraXConsole() {
         </span>
       </div>
 
-      {status.isLoading && <div className="mt-4"><Loading label="Checking Astra X configuration…" /></div>}
       {status.isError && <div className="mt-4"><Failed message={friendlyMessage(status.error)} onRetry={() => status.refetch()} /></div>}
 
       {status.isSuccess && (
