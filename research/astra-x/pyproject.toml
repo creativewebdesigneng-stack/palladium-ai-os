@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Model-agnostic, local-first research prototype for Blackstar Astra X."
 readme = "README.md"
 requires-python = ">=3.11"
-license = { text = "Proprietary" }
+license = "LicenseRef-Proprietary"
 dependencies = []
 
 [project.optional-dependencies]
