@@ -1,7 +1,7 @@
 """Local-only OpenAI-compatible chat adapter.
 
-Intended for a local Astra X process talking to the existing localhost-bound
-Blackstar provider proxy. Remote hosts and redirects are rejected.
+Intended for a local Astra X process talking to the existing authenticated
+localhost-bound Blackstar provider proxy. Remote hosts and redirects are rejected.
 """
 
 from __future__ import annotations
@@ -78,13 +78,15 @@ class LocalOpenAICompatibleProvider:
         *,
         base_url: str,
         model: str,
-        bearer_token: str | None = None,
+        bearer_token: str,
         timeout_seconds: float = 45.0,
         max_response_bytes: int = 2_000_000,
     ) -> None:
         self.base_url = validate_loopback_base_url(base_url)
         if not model.strip():
             raise ProviderConfigurationError("An explicit model ID is required.")
+        if not bearer_token.strip():
+            raise ProviderConfigurationError("An authenticated local proxy token is required.")
         if timeout_seconds <= 0:
             raise ProviderConfigurationError("Timeout must be positive.")
         if max_response_bytes < 1:
@@ -93,7 +95,11 @@ class LocalOpenAICompatibleProvider:
         self._bearer_token = bearer_token
         self.timeout_seconds = timeout_seconds
         self.max_response_bytes = max_response_bytes
-        self._opener = urllib.request.build_opener(_NoRedirectHandler())
+        # Ignore system proxy environment variables so loopback traffic stays local.
+        self._opener = urllib.request.build_opener(
+            urllib.request.ProxyHandler({}),
+            _NoRedirectHandler(),
+        )
 
     def chat(
         self,
@@ -127,14 +133,14 @@ class LocalOpenAICompatibleProvider:
             }
         ).encode("utf-8")
 
-        headers = {"Content-Type": "application/json", "Accept": "application/json"}
-        if self._bearer_token:
-            headers["Authorization"] = f"Bearer {self._bearer_token}"
-
         request = urllib.request.Request(
             f"{self.base_url}/chat/completions",
             data=payload,
-            headers=headers,
+            headers={
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+                "Authorization": f"Bearer {self._bearer_token}",
+            },
             method="POST",
         )
         try:
