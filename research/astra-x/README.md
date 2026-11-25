@@ -52,6 +52,23 @@ Requires Python 3.11 or newer.
     python -m pip install -e ".[dev]"
     python -m pytest
 
+## Reproducible local benchmark
+
+A small, versioned baseline dataset is stored at `benchmarks/baseline-v0.1.jsonl`. It covers reasoning, simple coding knowledge, research uncertainty handling and instruction following. The scorer uses transparent required-term checks; it is a smoke benchmark, not a substitute for HumanEval, SWE-bench, a blinded expert review or a safety evaluation.
+
+From the repository root, configure the local shell with the existing authenticated localhost proxy URL, model ID and bearer token. The runner reads:
+- `OPENAI_COMPATIBLE_BASE_URL`
+- `BLACKSTAR_NATIVE_MODEL`
+- `BLACKSTAR_LOCAL_PROXY_BEARER_TOKEN` (the token value must remain local and must never be committed)
+
+Then run:
+
+    python research/astra-x/scripts/run_benchmark.py
+
+The default report is written to `research/astra-x/results/latest.json`. Reports contain model ID, dataset version/name, UTC timestamp, per-case pass/fail, latency and output character counts. Provider error messages and credentials are not written to reports. Do not commit benchmark reports if prompts or outputs contain private data. Use a fresh output path for comparisons and preserve the dataset version.
+
+The benchmark runner never executes generated code, uses no remote judge and does not enable cloud fallback. Its required-term score is intentionally simple and must not be represented as a general intelligence score.
+
 ## Hardware and cost policy
 
 The initial target is the existing GTX 1080 Ti. No additional GPU purchase, paid inference service or automatic cloud fallback is authorised by this programme. Select models using measured VRAM use, context length, latency and task quality. Include KV cache and runtime overhead in memory measurements. A prior GPT-OSS 20B attempt did not fit the 11 GB configuration and is not an approved baseline without fresh evidence.
