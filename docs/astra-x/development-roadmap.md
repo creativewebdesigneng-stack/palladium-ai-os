@@ -20,7 +20,7 @@ Current implementation status is intentionally conservative: checked items below
 - [x] Enforce loopback-only URLs in the local adapter.
 - [x] Add timeouts, bounded response sizes, message validation and safe error handling.
 - [x] Test that remote hosts are rejected and redirects are blocked.
-- [x] Add a server-only text adapter that uses the existing pinned Blackstar gateway without cross-provider failover.\n- [ ] Register the Astra X capability/adapter with the existing AI Hub approval-gated execution gateway and authenticated route.
+- [x] Add a server-only text adapter that uses the existing pinned Blackstar gateway without cross-provider failover.\n- [x] Add a feature-flagged authenticated server entry point through the existing AI Hub execution gateway.\n- [ ] Register Astra X as a live AI Hub inventory capability and add its status/mission UI.
 
 **Gate:** local mock-server tests pass; owner-device integration test recorded separately.
 
