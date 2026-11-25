@@ -36,6 +36,10 @@ export default function AstraXConsole() {
   const state = status.data?.state ?? 'needs_configuration'
   const enabled = state === 'configured_unverified'
 
+  // Keep this unverified capability out of the normal AI Hub surface unless
+  // an operator explicitly enables it on the server.
+  if (status.isLoading || (status.isSuccess && state === 'disabled')) return null
+
   return (
     <section className="relative overflow-hidden rounded-[26px] border border-violet-300/15 bg-[linear-gradient(145deg,rgba(18,12,30,.82),rgba(5,5,10,.94))] p-5 shadow-[0_24px_80px_rgba(0,0,0,.22)] backdrop-blur-xl">
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-violet-200/30 to-transparent" />
