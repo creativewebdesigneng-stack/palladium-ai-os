@@ -85,7 +85,7 @@ def test_bearer_token_line_breaks_are_rejected():
         LocalOpenAICompatibleProvider(
             base_url="http://127.0.0.1:8080/v1",
             model="local",
-            bearer_token="token\\nforged",
+            bearer_token="token\nforged",
         )
 
 
