@@ -12,7 +12,7 @@ This directory is an **isolated research package**. It does not replace the exis
 - Local-only OpenAI-compatible chat adapter with loopback URL validation.
 - Redirect blocking and bounded response size.
 - Read-only Windows hardware/Ollama inventory script.
-- Unit tests for routing, spend guardrails and endpoint restrictions.
+- Bounded agent-plan validation with tool allowlists, argument schemas and approval gates.\n- Unit tests for routing, spend guardrails, agent policy and endpoint restrictions.
 
 The adapter is intended for a local Astra X process communicating with the existing authenticated local Blackstar provider proxy. The browser must never call Ollama directly. Provider credentials are injected by a trusted server-side process and must never be committed or exposed to client code.
 
@@ -51,6 +51,10 @@ Requires Python 3.11 or newer.
 
     python -m pip install -e ".[dev]"
     python -m pytest
+
+## Agent plan safety contract
+
+The `astra_x.agent` module validates proposed plans before an executor is ever introduced. Tools must be explicitly allowlisted and registered, arguments must match declared keys and remain bounded JSON, and side-effecting tools require an approval ID. Code execution and network requests are denied by default. This module does not execute tools or generated code.
 
 ## Reproducible local benchmark
 
