@@ -30,7 +30,7 @@ Blackstar also already contains:
 - scoped memory retrieval and context policy under `src/lib/memory/`;
 - Astra certification/evaluation suites under `src/lib/evals/` and `src/lib/ai/`.
 
-A server-only bridge now exists at `src/lib/ai/astra-x-runtime.server.ts`. It validates the existing native runtime flag/model/endpoint settings, requires HTTPS plus a server bearer key for non-loopback endpoints, bounds text requests, disables tools and calls `runChatPinned` only. It deliberately does not claim endpoint reachability or prove that a remote tunnel terminates on the owner's workstation.
+A server-only bridge now exists at `src/lib/ai/astra-x-runtime.server.ts`. It validates the existing native runtime flag/model/endpoint settings, requires HTTPS, a server bearer key and explicit ASTRA_X_LOCAL_BRIDGE_ATTESTED=true for non-loopback tunnel endpoints, bounds text requests, disables tools and calls `runChatPinned` only. It deliberately does not claim endpoint reachability or prove that a remote tunnel terminates on the owner's workstation.
 
 An authenticated server entry point now exists at `src/lib/ai/astra-x.functions.ts`. It uses the existing Supabase auth middleware and AI Hub execution gateway, and is disabled unless `ASTRA_X_ENABLED=true`. It routes text-only requests through the pinned compatible model bridge with no tools or cross-provider fallback. The console uses the existing Blackstar Memory Fabric and per-user memory preferences for scoped recall. Memory failures fail closed to no recalled context; the memory prompt is explicitly labelled untrusted reference data and cannot grant tools or permissions.
 
