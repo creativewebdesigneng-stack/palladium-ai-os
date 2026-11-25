@@ -30,7 +30,9 @@ Blackstar also already contains:
 - scoped memory retrieval and context policy under `src/lib/memory/`;
 - Astra certification/evaluation suites under `src/lib/evals/` and `src/lib/ai/`.
 
-Astra X should register a capability and use the existing AI Hub execution boundary and approval gate, then call the pinned server-side model gateway where a text-generation operation is required. It must not create a parallel model gateway, approval queue, memory fabric or agent runtime. The existing research package's plan validator is a local testable policy primitive, not a replacement for the server-side AI Hub gateway.
+A server-only bridge now exists at `src/lib/ai/astra-x-runtime.server.ts`. It validates the existing native runtime flag/model/endpoint settings, requires HTTPS plus a server bearer key for non-loopback endpoints, bounds text requests, disables tools and calls `runChatPinned` only. It deliberately does not claim endpoint reachability or prove that a remote tunnel terminates on the owner's workstation.
+
+The next integration step is to register an Astra X capability and adapter with the existing AI Hub execution boundary and approval gate, then expose it only through an authenticated server route. It must not create a parallel model gateway, approval queue, memory fabric or agent runtime. The existing research package's plan validator is a local testable policy primitive, not a replacement for the server-side AI Hub gateway.
 
 ### Existing local runtime to preserve
 
