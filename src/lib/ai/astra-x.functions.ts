@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { loadAstraXMemoryPrompt } from './astra-x-memory.server'
 import { createServerFn } from '@tanstack/react-start'
 import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware'
 import {
@@ -123,6 +124,11 @@ export const runAstraXTask = createServerFn({ method: 'POST' })
     if (!runtime) throw new Error('Astra X native runtime is not configured.')
 
     const taskId = `astra-x:${randomUUID()}`
+    const memoryPrompt = await loadAstraXMemoryPrompt({
+      sb: context.supabase as never,
+      userId: context.userId,
+      query: data.messages[data.messages.length - 1]?.content ?? '',
+    })
     const plan = createAstraXPlan(taskId, runtime.model)
     const gateway = new AiHubExecutionGateway(createPalladiumAiHubRegistry())
 
@@ -133,7 +139,10 @@ export const runAstraXTask = createServerFn({ method: 'POST' })
         messages: [
           {
             role: 'system',
-            content: 'You are Astra X, Blackstar’s local-first AI assistant. Answer clearly and accurately. Do not claim tool use, external access, or actions you have not performed. You have no tool permissions in this session.',
+            content: [
+              'You are Astra X, Blackstar’s local-first AI assistant. Answer clearly and accurately. Do not claim tool use, external access, or actions you have not performed. You have no tool permissions in this session.',
+              memoryPrompt,
+            ].filter(Boolean).join('\\n\\n'),
           },
           ...request.messages,
         ],
