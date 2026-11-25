@@ -142,7 +142,7 @@ export const runAstraXTask = createServerFn({ method: 'POST' })
             content: [
               'You are Astra X, Blackstar’s local-first AI assistant. Answer clearly and accurately. Do not claim tool use, external access, or actions you have not performed. You have no tool permissions in this session.',
               memoryPrompt,
-            ].filter(Boolean).join('\\n\\n'),
+            ].filter(Boolean).join('\n\n'),
           },
           ...request.messages,
         ],
