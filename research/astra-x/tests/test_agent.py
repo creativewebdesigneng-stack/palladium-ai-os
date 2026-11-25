@@ -1,6 +1,7 @@
 from astra_x.agent import (
     ActionKind,
     AgentPlan,
+    TaskEnvelope,
     AgentPolicy,
     PlanStep,
     SideEffect,
@@ -136,3 +137,36 @@ def test_enabled_code_and_network_actions_still_require_approval():
         approved_step_ids=frozenset({"code", "net"}),
     )
     assert approved.allowed is True
+
+
+
+def test_task_envelope_validates_identity_trace_and_budgets():
+    from astra_x.core import TaskKind
+
+    envelope = TaskEnvelope(
+        task_id="task-001",
+        trace_id="trace-001",
+        tenant_id="tenant-001",
+        actor_id="actor-001",
+        task_kind=TaskKind.REASONING,
+        objective="Explain the local-first routing decision.",
+        created_at="2026-11-25T02:00:00Z",
+    )
+    assert envelope.max_steps == 8
+    assert envelope.max_context_tokens == 8192
+
+
+def test_task_envelope_rejects_unbounded_budget_and_timezone_free_timestamp():
+    from astra_x.core import TaskKind
+
+    with pytest.raises(ValueError, match="max_context_tokens"):
+        TaskEnvelope(
+            task_id="task-001",
+            trace_id="trace-001",
+            tenant_id="tenant-001",
+            actor_id="actor-001",
+            task_kind=TaskKind.REASONING,
+            objective="test",
+            created_at="2026-11-25T02:00:00",
+            max_context_tokens=100_000,
+        )
