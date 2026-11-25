@@ -11,6 +11,7 @@ This directory is an **isolated research package**. It does not replace the exis
 - Remote inference disabled by default, with explicit cost ceilings.
 - Local-only OpenAI-compatible chat adapter with loopback URL validation.
 - Redirect blocking and bounded response size.
+- Read-only Windows hardware/Ollama inventory script.
 - Unit tests for routing, spend guardrails and endpoint restrictions.
 
 The adapter is intended for a local Astra X process communicating with the existing authenticated local Blackstar provider proxy. The browser must never call Ollama directly. Provider credentials are injected by a trusted server-side process and must never be committed or exposed to client code.
@@ -29,6 +30,14 @@ Previously recorded setup:
 These are prior recorded facts, not a fresh live health check. Verify them read-only before use. Do not change drivers, models, ports, proxy configuration or production settings without explicit approval.
 
 Ollama's current hardware documentation lists the GTX 1080 Ti (compute capability 6.1) as supported and specifies driver 570 or newer for compute capabilities 5.0–6.2: https://docs.ollama.com/gpu
+
+## Read-only Windows inventory
+
+From PowerShell in the repository root, run:
+
+    .\research\astra-x\scripts\Invoke-AstraXLocalInventory.ps1
+
+The script reports GPU name, VRAM and driver when nvidia-smi is available; Ollama version, installed/running model lists; and whether the Ollama API responds on 127.0.0.1:11434. It does not change files, drivers, models, services or settings. It does not collect environment variables, API keys or bearer tokens, and it does not contact remote hosts. If the local Ollama API uses a different port, the script deliberately does not guess it.
 
 ## Local development
 
