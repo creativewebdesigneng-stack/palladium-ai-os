@@ -125,7 +125,7 @@ export const runAstraXTask = createServerFn({ method: 'POST' })
 
     const taskId = `astra-x:${randomUUID()}`
     const memoryPrompt = await loadAstraXMemoryPrompt({
-      sb: context.supabase as never,
+      sb: context.supabase as Parameters<typeof loadAstraXMemoryPrompt>[0]['sb'],
       userId: context.userId,
       query: data.messages[data.messages.length - 1]?.content ?? '',
     })
