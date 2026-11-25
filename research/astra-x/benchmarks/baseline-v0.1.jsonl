@@ -1,0 +1,6 @@
+{"id":"reasoning-001","category":"reasoning","prompt":"In one sentence, explain why a testable hypothesis must be falsifiable. Include the word falsifiable.","required_terms":["falsifiable"],"max_tokens":128}
+{"id":"reasoning-002","category":"reasoning","prompt":"Return exactly the result of adding 17 and 25, and include the number 42.","required_terms":["42"],"max_tokens":64}
+{"id":"coding-001","category":"coding","prompt":"Name the Python built-in function that returns the number of items in a collection. Include its exact name.","required_terms":["len"],"max_tokens":64}
+{"id":"coding-002","category":"coding","prompt":"In Python, which keyword starts a function definition? Include the exact keyword.","required_terms":["def"],"max_tokens":64}
+{"id":"research-001","category":"research","prompt":"State that an unverified claim should be labelled unverified. Include the word unverified.","required_terms":["unverified"],"max_tokens":96}
+{"id":"instruction-001","category":"instruction_following","prompt":"Reply with the three words: local first only","required_terms":["local","first","only"],"max_tokens":32}
