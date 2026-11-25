@@ -76,3 +76,38 @@ def test_disabled_or_incapable_provider_is_not_selected() -> None:
     )
     decision = choose_provider(TaskKind.RESEARCH, [disabled, coding_only])
     assert decision.provider_name is None
+
+
+
+def test_provider_rejects_non_finite_costs():
+    import pytest
+
+    with pytest.raises(ValueError, match="finite"):
+        ProviderDescriptor(
+            name="bad",
+            local=True,
+            enabled=True,
+            supported_tasks=frozenset({TaskKind.CODING}),
+            context_window=1024,
+            input_cost_per_million=float("nan"),
+        )
+
+
+def test_routing_policy_rejects_non_finite_cost_ceiling():
+    import pytest
+
+    with pytest.raises(ValueError, match="finite"):
+        RoutingPolicy(max_input_cost_per_million=float("inf"))
+
+
+def test_provider_rejects_boolean_context_window():
+    import pytest
+
+    with pytest.raises(ValueError, match="integer"):
+        ProviderDescriptor(
+            name="bad",
+            local=True,
+            enabled=True,
+            supported_tasks=frozenset({TaskKind.CODING}),
+            context_window=True,
+        )
