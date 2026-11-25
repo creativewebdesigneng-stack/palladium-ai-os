@@ -8,6 +8,7 @@ falls back to a paid provider.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
 from enum import StrEnum
 from typing import Iterable
 
@@ -34,10 +35,15 @@ class ProviderDescriptor:
     def __post_init__(self) -> None:
         if not self.name.strip():
             raise ValueError("Provider name must not be empty")
-        if self.context_window < 1:
-            raise ValueError("Context window must be positive")
-        if self.input_cost_per_million < 0 or self.output_cost_per_million < 0:
-            raise ValueError("Provider costs cannot be negative")
+        if not isinstance(self.context_window, int) or isinstance(self.context_window, bool) or self.context_window < 1:
+            raise ValueError("Context window must be a positive integer")
+        if not isinstance(self.local, bool) or not isinstance(self.enabled, bool):
+            raise ValueError("Provider locality and enabled flags must be boolean")
+        if not all(isinstance(task, TaskKind) for task in self.supported_tasks):
+            raise ValueError("Provider tasks must use TaskKind values")
+        costs = (self.input_cost_per_million, self.output_cost_per_million)
+        if not all(math.isfinite(cost) and cost >= 0 for cost in costs):
+            raise ValueError("Provider costs must be finite and non-negative")
 
 
 @dataclass(frozen=True, slots=True)
@@ -50,8 +56,11 @@ class RoutingPolicy:
     prefer_local: bool = True
 
     def __post_init__(self) -> None:
-        if self.max_input_cost_per_million < 0 or self.max_output_cost_per_million < 0:
-            raise ValueError("Cost limits cannot be negative")
+        limits = (self.max_input_cost_per_million, self.max_output_cost_per_million)
+        if not all(math.isfinite(limit) and limit >= 0 for limit in limits):
+            raise ValueError("Cost limits must be finite and non-negative")
+        if not isinstance(self.allow_remote, bool) or not isinstance(self.prefer_local, bool):
+            raise ValueError("Routing policy flags must be boolean")
 
 
 @dataclass(frozen=True, slots=True)
