@@ -22,13 +22,13 @@ Current implementation status is intentionally conservative: checked items below
 - [x] Test that remote hosts are rejected and redirects are blocked.
 - [x] Add a server-only text adapter that uses the existing pinned Blackstar gateway without cross-provider failover.
 - [x] Add a feature-flagged authenticated server entry point through the existing AI Hub execution gateway.
-- [ ] Register Astra X as a live AI Hub inventory capability and add its status/mission UI.
+- [ ] Register Astra X as a live AI Hub inventory capability.
 
 **Gate:** local mock-server tests pass; owner-device integration test recorded separately.
 
 ### A2. Routing, task envelopes and traces
-- [ ] Add task envelope schemas and deterministic routing policy.
-- [x] Enforce local-only and zero-spend defaults in the research router.
+- [ ] Add typed task envelope schemas and trace propagation.
+- [x] Add deterministic routing policy and enforce local-only, zero-spend defaults in the research router.
 - [ ] Record model identity, policy decision, trace ID and latency.
 - [ ] Add context budget and truncation detection.
 
@@ -63,7 +63,6 @@ Current implementation status is intentionally conservative: checked items below
 ### A6. Blackstar UI integration
 - [x] Add a feature-flagged Astra X status and text-test console to the existing AI Hub screen.
 - [ ] Add full routing explanation, mission timeline, approval and evaluation result surfaces.
-- [ ] Add approvals and evaluation results.
 - [x] Use existing TanStack Start server functions, Supabase auth middleware, AI Hub execution gateway and design system.
 - [x] Keep the new Astra X entry point disabled unless the server-side ASTRA_X_ENABLED flag is explicitly enabled.
 
