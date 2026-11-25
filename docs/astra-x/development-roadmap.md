@@ -58,10 +58,10 @@ Current implementation status is intentionally conservative: checked items below
 **Gate:** retrieval and isolation tests pass.
 
 ### A6. Blackstar UI integration
-- [ ] Add status, routing explanation, model provenance and mission timeline.
+- [x] Add a feature-flagged Astra X status and text-test console to the existing AI Hub screen.\n- [ ] Add full routing explanation, mission timeline, approval and evaluation result surfaces.
 - [ ] Add approvals and evaluation results.
-- [ ] Use existing TanStack Start routes, auth and design system.
-- [ ] Keep feature flags off until backend and operator tests pass.
+- [x] Use existing TanStack Start server functions, Supabase auth middleware, AI Hub execution gateway and design system.
+- [x] Keep the new Astra X entry point disabled unless the server-side ASTRA_X_ENABLED flag is explicitly enabled.
 
 **Gate:** preview-only integration passes typecheck, lint, tests and security review.
 
