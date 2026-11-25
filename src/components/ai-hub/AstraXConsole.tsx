@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
 import { Activity, Cpu, Play, ShieldCheck } from 'lucide-react'
-import { Failed, Loading } from '@/components/business/live'
+import { Failed } from '@/components/business/live'
 import { friendlyMessage } from '@/lib/errors'
 import { getAstraXStatus, runAstraXTask } from '@/lib/ai/astra-x.functions'
 
