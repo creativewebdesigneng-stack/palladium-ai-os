@@ -12,7 +12,7 @@ This directory is an **isolated research package**. It does not replace the exis
 - Local-only OpenAI-compatible chat adapter with loopback URL validation.
 - Redirect blocking and bounded response size.
 - Read-only Windows hardware/Ollama inventory script.
-- Bounded agent-plan validation with tool allowlists, argument schemas and approval gates.
+- Bounded task envelopes with tenant/actor identity, trace IDs and token/step budgets; agent-plan validation with tool allowlists, argument schemas and approval gates.
 - Recomp Lab job/result contracts with provenance hashes, resource limits, operation-specific permissions and verification evidence.
 - Reproducible model experiment and artifact manifest contracts with weight/data hashes, licence metadata, Git revisions and local-compute policy.
 - Blackstar Memory Fabric integration using user-scoped recall and stored memory preferences; retrieval failures fail closed and recalled content is labelled untrusted.
