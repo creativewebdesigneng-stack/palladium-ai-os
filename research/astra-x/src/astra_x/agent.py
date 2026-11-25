@@ -6,9 +6,12 @@ open network connections or grant permissions.
 from __future__ import annotations
 
 import json
+from datetime import datetime
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Mapping
+
+from .core import TaskKind
 
 
 class ActionKind(StrEnum):
@@ -22,6 +25,45 @@ class SideEffect(StrEnum):
     NONE = "none"
     LOCAL_WRITE = "local_write"
     EXTERNAL_WRITE = "external_write"
+
+
+@dataclass(frozen=True, slots=True)
+class TaskEnvelope:
+    """Typed, bounded task metadata for planning and trace correlation."""
+
+    task_id: str
+    trace_id: str
+    tenant_id: str
+    actor_id: str
+    task_kind: TaskKind
+    objective: str
+    created_at: str
+    max_steps: int = 8
+    max_context_tokens: int = 8192
+    max_output_tokens: int = 512
+
+    def __post_init__(self) -> None:
+        for field in ("task_id", "trace_id", "tenant_id", "actor_id", "objective", "created_at"):
+            value = getattr(self, field)
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(f"{field} is required.")
+        if not isinstance(self.task_kind, TaskKind):
+            raise ValueError("Task kind must use a supported TaskKind value.")
+        try:
+            timestamp = datetime.fromisoformat(self.created_at.replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise ValueError("created_at must be an ISO 8601 timestamp.") from exc
+        if timestamp.tzinfo is None:
+            raise ValueError("created_at must include a timezone.")
+        bounds = {
+            "max_steps": (1, 32),
+            "max_context_tokens": (128, 32768),
+            "max_output_tokens": (1, 8192),
+        }
+        for field, (minimum, maximum) in bounds.items():
+            value = getattr(self, field)
+            if not isinstance(value, int) or isinstance(value, bool) or not minimum <= value <= maximum:
+                raise ValueError(f"{field} must be an integer between {minimum} and {maximum}.")
 
 
 @dataclass(frozen=True, slots=True)
