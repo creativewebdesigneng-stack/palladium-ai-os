@@ -114,3 +114,25 @@ def test_unknown_approval_id_is_rejected():
     result = validate_plan(plan, {}, approved_step_ids=frozenset({"not-in-plan"}))
     assert result.allowed is False
     assert any("Approval set" in error for error in result.errors)
+
+
+
+def test_enabled_code_and_network_actions_still_require_approval():
+    plan = AgentPlan(
+        "task-1",
+        (
+            PlanStep("code", ActionKind.CODE_EXECUTION, "Run in sandbox"),
+            PlanStep("net", ActionKind.NETWORK_REQUEST, "Request approved endpoint"),
+        ),
+    )
+    policy = AgentPolicy(allow_code_execution=True, allow_network_requests=True)
+    pending = validate_plan(plan, {}, policy)
+    assert pending.allowed is False
+    assert pending.approval_required == ("code", "net")
+    approved = validate_plan(
+        plan,
+        {},
+        policy,
+        approved_step_ids=frozenset({"code", "net"}),
+    )
+    assert approved.allowed is True
