@@ -7,6 +7,7 @@ localhost-bound Blackstar provider proxy. Remote hosts and redirects are rejecte
 from __future__ import annotations
 
 import ipaddress
+import math
 import json
 import urllib.error
 import urllib.parse
@@ -87,12 +88,15 @@ class LocalOpenAICompatibleProvider:
             raise ProviderConfigurationError("An explicit model ID is required.")
         if not bearer_token.strip():
             raise ProviderConfigurationError("An authenticated local proxy token is required.")
-        if timeout_seconds <= 0:
-            raise ProviderConfigurationError("Timeout must be positive.")
-        if max_response_bytes < 1:
-            raise ProviderConfigurationError("Response size limit must be positive.")
+        if not math.isfinite(timeout_seconds) or timeout_seconds <= 0:
+            raise ProviderConfigurationError("Timeout must be a finite positive number.")
+        if not isinstance(max_response_bytes, int) or isinstance(max_response_bytes, bool) or max_response_bytes < 1:
+            raise ProviderConfigurationError("Response size limit must be a positive integer.")
+        token = bearer_token.strip()
+        if any(character in token for character in "\\r\\n"):
+            raise ProviderConfigurationError("Bearer token must not contain line breaks.")
         self.model = model.strip()
-        self._bearer_token = bearer_token
+        self._bearer_token = token
         self.timeout_seconds = timeout_seconds
         self.max_response_bytes = max_response_bytes
         # Ignore system proxy environment variables so loopback traffic stays local.
@@ -112,8 +116,8 @@ class LocalOpenAICompatibleProvider:
             raise ValueError("At least one message is required.")
         if max_tokens < 1 or max_tokens > 8192:
             raise ValueError("max_tokens must be between 1 and 8192.")
-        if temperature < 0 or temperature > 2:
-            raise ValueError("temperature must be between 0 and 2.")
+        if not math.isfinite(temperature) or temperature < 0 or temperature > 2:
+            raise ValueError("temperature must be finite and between 0 and 2.")
 
         safe_messages: list[dict[str, str]] = []
         for message in messages:
