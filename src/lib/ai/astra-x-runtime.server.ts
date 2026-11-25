@@ -52,8 +52,12 @@ export function getAstraXRuntimeConfiguration(
 
   const host = endpoint.hostname.toLowerCase().replace(/^\[|\]$/g, '')
   const endpointIsLoopback = host === 'localhost' || host === '127.0.0.1' || host === '::1'
-  if (!endpointIsLoopback && (endpoint.protocol !== 'https:' || !env['OPENAI_COMPATIBLE_API_KEY']?.trim())) {
-    throw new Error('A non-loopback Astra X endpoint requires HTTPS and a server-side bearer key.')
+  if (!endpointIsLoopback && (
+    endpoint.protocol !== 'https:' ||
+    !env['OPENAI_COMPATIBLE_API_KEY']?.trim() ||
+    !enabled(env['ASTRA_X_LOCAL_BRIDGE_ATTESTED'])
+  )) {
+    throw new Error('A non-loopback Astra X endpoint requires HTTPS, a server-side bearer key and ASTRA_X_LOCAL_BRIDGE_ATTESTED=true.')
   }
 
   return {
