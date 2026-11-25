@@ -35,10 +35,14 @@ class ToolDefinition:
     def __post_init__(self) -> None:
         if not self.tool_id.strip():
             raise ValueError("Tool ID must not be empty.")
+        if not all(isinstance(key, str) and key for key in self.allowed_argument_keys):
+            raise ValueError("Tool argument keys must be non-empty strings.")
         if not self.required_argument_keys.issubset(self.allowed_argument_keys):
             raise ValueError("Required tool arguments must be allowed arguments.")
         if not isinstance(self.enabled, bool):
             raise ValueError("Tool enabled flag must be boolean.")
+        if not isinstance(self.side_effect, SideEffect):
+            raise ValueError("Tool side-effect classification is invalid.")
 
 
 @dataclass(frozen=True, slots=True)
@@ -83,8 +87,14 @@ def validate_plan(
     errors: list[str] = []
     approvals: list[str] = []
 
-    if not plan.task_id.strip():
+    if not isinstance(plan.task_id, str) or not plan.task_id.strip():
         errors.append("Task ID must not be empty.")
+    if not isinstance(policy.allow_code_execution, bool) or not isinstance(policy.allow_network_requests, bool):
+        errors.append("Agent policy flags must be boolean.")
+    if not isinstance(policy.allowed_tools, frozenset) or not all(isinstance(name, str) and name for name in policy.allowed_tools):
+        errors.append("Allowed tools must be a set of non-empty tool IDs.")
+    if not plan.steps:
+        errors.append("Plan must contain at least one step.")
     if not isinstance(policy.max_steps, int) or isinstance(policy.max_steps, bool) or policy.max_steps < 1:
         errors.append("Maximum step count must be a positive integer.")
     if not isinstance(policy.max_argument_bytes, int) or isinstance(policy.max_argument_bytes, bool) or policy.max_argument_bytes < 1:
@@ -94,12 +104,15 @@ def validate_plan(
 
     seen: set[str] = set()
     for step in plan.steps:
-        if not step.step_id.strip() or step.step_id in seen:
+        if not isinstance(step.step_id, str) or not step.step_id.strip() or step.step_id in seen:
             errors.append("Plan contains an empty or duplicate step ID.")
             continue
         seen.add(step.step_id)
-        if not step.objective.strip():
+        if not isinstance(step.objective, str) or not step.objective.strip():
             errors.append(f"Step {step.step_id} has no objective.")
+        if not isinstance(step.action, ActionKind):
+            errors.append(f"Step {step.step_id} has an unsupported action.")
+            continue
 
         if step.action == ActionKind.ANSWER:
             if step.tool_id is not None or step.arguments:
@@ -122,10 +135,13 @@ def validate_plan(
             errors.append(f"Tool for step {step.step_id} is not allowlisted.")
             continue
         definition = tools.get(step.tool_id)
-        if definition is None or not definition.enabled:
+        if definition is None or not definition.enabled or definition.tool_id != step.tool_id:
             errors.append(f"Tool for step {step.step_id} is not registered and enabled.")
             continue
 
+        if step.arguments is not None and not isinstance(step.arguments, Mapping):
+            errors.append(f"Tool step {step.step_id} arguments must be an object.")
+            continue
         arguments = dict(step.arguments or {})
         keys = frozenset(arguments)
         if not keys.issubset(definition.allowed_argument_keys):
