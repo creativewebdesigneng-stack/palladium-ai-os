@@ -7,7 +7,7 @@
 Current implementation status is intentionally conservative: checked items below exist in the isolated research package and have dedicated tests. They are not yet wired into Blackstar production routes, verified against the owner's live Ollama proxy, or production-enabled.
 
 ### A0. Inventory and baseline
-- [ ] Map existing Astra routes, provider gateway and local runtime configuration.
+- [x] Map the existing Blackstar model gateway, AI Hub execution boundary and local proxy configuration.
 - [ ] Confirm current Ollama version, model list, driver version and GPU detection on the owner's PC.
 - [ ] Capture baseline model latency, VRAM use, context behaviour and task quality.
 - [ ] Record the integration boundary without exposing secrets or changing production.
@@ -20,7 +20,9 @@ Current implementation status is intentionally conservative: checked items below
 - [x] Enforce loopback-only URLs in the local adapter.
 - [x] Add timeouts, bounded response sizes, message validation and safe error handling.
 - [x] Test that remote hosts are rejected and redirects are blocked.
-- [x] Add a server-only text adapter that uses the existing pinned Blackstar gateway without cross-provider failover.\n- [x] Add a feature-flagged authenticated server entry point through the existing AI Hub execution gateway.\n- [ ] Register Astra X as a live AI Hub inventory capability and add its status/mission UI.
+- [x] Add a server-only text adapter that uses the existing pinned Blackstar gateway without cross-provider failover.
+- [x] Add a feature-flagged authenticated server entry point through the existing AI Hub execution gateway.
+- [ ] Register Astra X as a live AI Hub inventory capability and add its status/mission UI.
 
 **Gate:** local mock-server tests pass; owner-device integration test recorded separately.
 
@@ -37,6 +39,7 @@ Current implementation status is intentionally conservative: checked items below
 - [ ] Store prompt, expected outcome, rubric and source provenance.
 - [x] Add deterministic smoke scoring; human review and richer rubrics remain open.
 - [ ] Track pass rate, regression, latency, VRAM and failure categories.
+- [x] Define model artifact and experiment manifests with licence, weight/data checksums, code revision and evaluation provenance.
 
 **Gate:** repeatable baseline report for the current Qwen3 8B quantised model.
 
@@ -58,7 +61,8 @@ Current implementation status is intentionally conservative: checked items below
 **Gate:** retrieval and isolation tests pass.
 
 ### A6. Blackstar UI integration
-- [x] Add a feature-flagged Astra X status and text-test console to the existing AI Hub screen.\n- [ ] Add full routing explanation, mission timeline, approval and evaluation result surfaces.
+- [x] Add a feature-flagged Astra X status and text-test console to the existing AI Hub screen.
+- [ ] Add full routing explanation, mission timeline, approval and evaluation result surfaces.
 - [ ] Add approvals and evaluation results.
 - [x] Use existing TanStack Start server functions, Supabase auth middleware, AI Hub execution gateway and design system.
 - [x] Keep the new Astra X entry point disabled unless the server-side ASTRA_X_ENABLED flag is explicitly enabled.
