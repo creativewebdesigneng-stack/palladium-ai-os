@@ -16,6 +16,7 @@ const envKeys = [
   'BLACKSTAR_NATIVE_MODEL',
   'OPENAI_COMPATIBLE_BASE_URL',
   'OPENAI_COMPATIBLE_API_KEY',
+  'ASTRA_X_LOCAL_BRIDGE_ATTESTED',
 ] as const
 const originalEnv = Object.fromEntries(envKeys.map((key) => [key, process.env[key]]))
 
@@ -24,6 +25,7 @@ beforeEach(() => {
   process.env['BLACKSTAR_NATIVE_MODEL'] = 'qwen3:8b-q4_K_M'
   process.env['OPENAI_COMPATIBLE_BASE_URL'] = 'http://127.0.0.1:12780/v1'
   delete process.env['OPENAI_COMPATIBLE_API_KEY']
+  delete process.env['ASTRA_X_LOCAL_BRIDGE_ATTESTED']
   mocks.runChatPinned.mockReset()
   mocks.runChatPinned.mockResolvedValue({
     text: 'local response',
@@ -72,7 +74,19 @@ describe('Astra X Blackstar gateway bridge', () => {
       BLACKSTAR_NATIVE_PRIMARY: 'true',
       BLACKSTAR_NATIVE_MODEL: 'qwen3:8b-q4_K_M',
       OPENAI_COMPATIBLE_BASE_URL: 'https://bridge.example.test/v1',
-    })).toThrow('requires HTTPS and a server-side bearer key')
+      OPENAI_COMPATIBLE_API_KEY: 'secret',
+    })).toThrow('ASTRA_X_LOCAL_BRIDGE_ATTESTED=true')
+
+    expect(getAstraXRuntimeConfiguration({
+      BLACKSTAR_NATIVE_PRIMARY: 'true',
+      BLACKSTAR_NATIVE_MODEL: 'qwen3:8b-q4_K_M',
+      OPENAI_COMPATIBLE_BASE_URL: 'https://bridge.example.test/v1',
+      OPENAI_COMPATIBLE_API_KEY: 'secret',
+      ASTRA_X_LOCAL_BRIDGE_ATTESTED: 'true',
+    })).toMatchObject({
+      configured: true,
+      endpointIsLoopback: false,
+    })
   })
 
   it('rejects credentials and query strings embedded in the endpoint URL', () => {
