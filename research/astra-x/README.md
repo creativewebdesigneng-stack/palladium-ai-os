@@ -63,7 +63,7 @@ A small, versioned baseline dataset is stored at `benchmarks/baseline-v0.1.jsonl
 From the repository root, configure the local shell with the existing authenticated localhost proxy URL, model ID and bearer token. The runner reads:
 - `OPENAI_COMPATIBLE_BASE_URL`
 - `BLACKSTAR_NATIVE_MODEL`
-- `BLACKSTAR_LOCAL_PROXY_BEARER_TOKEN` (the token value must remain local and must never be committed)
+- a local bearer token from `BLACKSTAR_LOCAL_PROXY_BEARER_TOKEN`, `BLACKSTAR_BRIDGE_TOKEN` or the existing server setting `OPENAI_COMPATIBLE_API_KEY` (the token value must remain local and must never be committed)
 
 Then run:
 
