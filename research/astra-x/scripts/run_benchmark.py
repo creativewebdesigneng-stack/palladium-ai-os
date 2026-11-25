@@ -23,11 +23,17 @@ def main() -> int:
         print("Output path must not overwrite the benchmark dataset.", file=sys.stderr)
         return 2
 
-    token = os.environ.get("BLACKSTAR_LOCAL_PROXY_BEARER_TOKEN", "")
+    token = (
+        os.environ.get("BLACKSTAR_LOCAL_PROXY_BEARER_TOKEN")
+        or os.environ.get("BLACKSTAR_BRIDGE_TOKEN")
+        or os.environ.get("OPENAI_COMPATIBLE_API_KEY")
+        or ""
+    )
     if not args.base_url or not args.model or not token:
         print(
             "Missing local provider configuration. Set OPENAI_COMPATIBLE_BASE_URL, "
-            "BLACKSTAR_NATIVE_MODEL and BLACKSTAR_LOCAL_PROXY_BEARER_TOKEN in this "
+            "BLACKSTAR_NATIVE_MODEL and a local proxy token (BLACKSTAR_LOCAL_PROXY_BEARER_TOKEN, "
+            "BLACKSTAR_BRIDGE_TOKEN or OPENAI_COMPATIBLE_API_KEY) in this "
             "local shell; never pass or commit the token as a command-line argument.",
             file=sys.stderr,
         )
