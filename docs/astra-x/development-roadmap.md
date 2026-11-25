@@ -119,8 +119,8 @@ Current implementation status is intentionally conservative: checked items below
 
 ## Workstream D — Recomp Lab (parallel)
 
-- [ ] Maintain isolated package and independent tests.
-- [ ] Add strict job/result schemas and artifact provenance.
+- [x] Maintain isolated package and independent tests.
+- [x] Add strict job/result schemas, artifact hashes, authorisation records, resource limits and verification evidence.
 - [ ] Build executable inspection for authorised sample binaries.
 - [ ] Build instruction decoder and small translation subset.
 - [ ] Add equivalence tests against reference programs.
