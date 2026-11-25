@@ -85,6 +85,29 @@ function createAstraXPlan(taskId: string, model: string): AiHubOrchestrationPlan
 }
 
 /**
+ * Reports configuration state only. "configured" does not mean reachable or
+ * verified, and the endpoint hostname/bearer key are never returned.
+ */
+export const getAstraXStatus = createServerFn({ method: 'GET' })
+  .middleware([requireSupabaseAuth])
+  .handler(async () => {
+    if (!['1', 'true', 'yes', 'on'].includes((process.env['ASTRA_X_ENABLED'] ?? '').trim().toLowerCase())) {
+      return { state: 'disabled' as const, model: null, endpointIsLoopback: null }
+    }
+    try {
+      const runtime = getAstraXRuntimeConfiguration()
+      if (!runtime) return { state: 'needs_configuration' as const, model: null, endpointIsLoopback: null }
+      return {
+        state: 'configured_unverified' as const,
+        model: runtime.model,
+        endpointIsLoopback: runtime.endpointIsLoopback,
+      }
+    } catch {
+      return { state: 'invalid_configuration' as const, model: null, endpointIsLoopback: null }
+    }
+  })
+
+/**
  * Authenticated, feature-flagged Astra X text entry point.
  * The AI Hub execution gateway remains the policy boundary; the adapter calls
  * only the pinned compatible model and never executes model-proposed tools.
