@@ -93,7 +93,7 @@ class LocalOpenAICompatibleProvider:
         if not isinstance(max_response_bytes, int) or isinstance(max_response_bytes, bool) or max_response_bytes < 1:
             raise ProviderConfigurationError("Response size limit must be a positive integer.")
         token = bearer_token.strip()
-        if any(character in token for character in "\\r\\n"):
+        if any(character in token for character in "\r\n"):
             raise ProviderConfigurationError("Bearer token must not contain line breaks.")
         self.model = model.strip()
         self._bearer_token = token
