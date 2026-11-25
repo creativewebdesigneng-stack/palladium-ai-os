@@ -19,6 +19,10 @@ def main() -> int:
     parser.add_argument("--base-url", default=os.environ.get("OPENAI_COMPATIBLE_BASE_URL", ""))
     args = parser.parse_args()
 
+    if Path(args.dataset).resolve() == Path(args.output).resolve():
+        print("Output path must not overwrite the benchmark dataset.", file=sys.stderr)
+        return 2
+
     token = os.environ.get("BLACKSTAR_LOCAL_PROXY_BEARER_TOKEN", "")
     if not args.base_url or not args.model or not token:
         print(
