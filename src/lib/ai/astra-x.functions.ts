@@ -26,11 +26,10 @@ function validateAstraXInput(input: unknown): AstraXInput {
     const message = raw && typeof raw === 'object' ? raw as Record<string, unknown> : {}
     const role = message['role']
     const content = message['content']
-    if (!['system', 'user', 'assistant'].includes(String(role)) ||
-        typeof content !== 'string' || !content.trim() || content.length > 24_000) {
-      throw new Error('Astra X messages must contain supported roles and bounded text.')
+    if (role !== 'user' || typeof content !== 'string' || !content.trim() || content.length > 24_000) {
+      throw new Error('Astra X client requests accept user messages only, with bounded text.')
     }
-    return { role: role as AstraXMessage['role'], content }
+    return { role: 'user', content }
   })
 
   if (!messages.some((message) => message.role === 'user')) {
@@ -129,7 +128,16 @@ export const runAstraXTask = createServerFn({ method: 'POST' })
 
     gateway.registerAdapter('model-gateway', async (_plan, executionContext) => {
       const request = executionContext.input as AstraXNativeChatRequest
-      const response = await runAstraXNativeChat(request)
+      const response = await runAstraXNativeChat({
+        ...request,
+        messages: [
+          {
+            role: 'system',
+            content: 'You are Astra X, Blackstar’s local-first AI assistant. Answer clearly and accurately. Do not claim tool use, external access, or actions you have not performed. You have no tool permissions in this session.',
+          },
+          ...request.messages,
+        ],
+      })
       return {
         status: 'completed',
         adapter: 'model-gateway',
