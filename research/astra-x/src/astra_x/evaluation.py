@@ -46,14 +46,27 @@ def load_cases(path: str | Path) -> list[BenchmarkCase]:
                 continue
             try:
                 item = json.loads(line)
+                if not isinstance(item, dict):
+                    raise ValueError("Case must be a JSON object.")
+                case_id = item.get("id")
+                category = item.get("category")
+                prompt = item.get("prompt")
+                terms = item.get("required_terms", [])
+                max_tokens = item.get("max_tokens", 512)
+                if not all(isinstance(value, str) for value in (case_id, category, prompt)):
+                    raise ValueError("id, category and prompt must be strings.")
+                if not isinstance(terms, list) or not all(isinstance(term, str) for term in terms):
+                    raise ValueError("required_terms must be a list of strings.")
+                if not isinstance(max_tokens, int) or isinstance(max_tokens, bool):
+                    raise ValueError("max_tokens must be an integer.")
                 case = BenchmarkCase(
-                    case_id=str(item["id"]),
-                    category=str(item["category"]),
-                    prompt=str(item["prompt"]),
-                    required_terms=tuple(str(term) for term in item.get("required_terms", [])),
-                    max_tokens=int(item.get("max_tokens", 512)),
+                    case_id=case_id,
+                    category=category,
+                    prompt=prompt,
+                    required_terms=tuple(terms),
+                    max_tokens=max_tokens,
                 )
-            except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+            except (TypeError, ValueError, json.JSONDecodeError) as exc:
                 raise ValueError(f"Invalid benchmark case on line {line_number}.") from exc
             if not case.case_id.strip() or case.case_id in seen:
                 raise ValueError(f"Empty or duplicate benchmark id on line {line_number}.")
@@ -66,7 +79,6 @@ def load_cases(path: str | Path) -> list[BenchmarkCase]:
     if not cases:
         raise ValueError("Benchmark dataset contains no cases.")
     return cases
-
 
 def evaluate_cases(
     provider: ChatProvider,
