@@ -48,7 +48,7 @@ def test_binary_operations_require_explicit_binary_analysis_capability():
         operation=RecompOperation.DISASSEMBLE,
         allowed_capabilities=frozenset({"metadata_inspection"}),
     )
-    assert "Binary analysis capability is not explicitly authorised." in validate_job_for_execution(job)
+    assert "Operation requires explicit binary_analysis capability." in validate_job_for_execution(job)
 
 
 def test_shader_validation_requires_its_own_capability():
@@ -56,7 +56,7 @@ def test_shader_validation_requires_its_own_capability():
         operation=RecompOperation.VALIDATE_SHADER,
         allowed_capabilities=frozenset({"metadata_inspection"}),
     )
-    assert "Shader validation capability is not explicitly authorised." in validate_job_for_execution(job)
+    assert "Operation requires explicit shader_validation capability." in validate_job_for_execution(job)
 
 
 def test_resource_limits_are_bounded():
@@ -128,3 +128,9 @@ def test_valid_completed_result_links_to_authorised_input():
         test_evidence=("report schema passed", "input hash matched"),
     )
     assert validate_result_for_job(job, result) == ()
+
+
+
+def test_inspection_operation_requires_metadata_capability():
+    job = make_job(allowed_capabilities=frozenset({"output_comparison"}))
+    assert "Operation requires explicit metadata_inspection capability." in validate_job_for_execution(job)
