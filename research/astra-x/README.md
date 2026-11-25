@@ -12,7 +12,7 @@ This directory is an **isolated research package**. It does not replace the exis
 - Local-only OpenAI-compatible chat adapter with loopback URL validation.
 - Redirect blocking and bounded response size.
 - Read-only Windows hardware/Ollama inventory script.
-- Bounded agent-plan validation with tool allowlists, argument schemas and approval gates.\n- Recomp Lab job/result contracts with provenance hashes, resource limits, operation-specific permissions and verification evidence.\n- Unit tests for routing, spend guardrails, agent policy and endpoint restrictions.
+- Bounded agent-plan validation with tool allowlists, argument schemas and approval gates.\n- Recomp Lab job/result contracts with provenance hashes, resource limits, operation-specific permissions and verification evidence.\n- Reproducible model experiment and artifact manifest contracts with weight/data hashes, licence metadata, Git revisions and local-compute policy.\n- Unit tests for routing, spend guardrails, agent policy and endpoint restrictions.
 
 The research adapter is intended for a local Astra X process communicating with the existing authenticated local Blackstar provider proxy. The optional Blackstar AI Hub entry point is feature-flagged by server-side ASTRA_X_ENABLED (off unless explicitly set). The browser must never call Ollama directly. Provider credentials are injected by a trusted server-side process and must never be committed or exposed to client code.
 
@@ -51,6 +51,10 @@ Requires Python 3.11 or newer.
 
     python -m pip install -e ".[dev]"
     python -m pytest
+
+## Model experiment and artifact provenance
+
+The `astra_x.experiments` module records experiment method, compute location, hardware profile, dataset/config hashes, source revision, model ownership, weight checksum, licence reference and evaluation evidence. Cloud compute is rejected by the default policy unless an explicit future programme decision changes it. These are governance contracts, not a training pipeline.
 
 ## Recomp Lab contract
 
