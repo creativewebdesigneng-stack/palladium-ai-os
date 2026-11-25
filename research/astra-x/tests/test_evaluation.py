@@ -74,3 +74,20 @@ def test_report_contains_metadata_summary_and_case_results(tmp_path):
     assert report["schema_version"] == "1.0"
     assert report["summary"]["passed"] == 1
     assert report["results"][0]["case_id"] == "a"
+
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        '["not", "an", "object"]',
+        '{"id":"a","category":"reasoning","prompt":"x","required_terms":"chars"}',
+        '{"id":"a","category":"reasoning","prompt":"x","max_tokens":true}',
+        '{"id":1,"category":"reasoning","prompt":"x"}',
+    ],
+)
+def test_load_cases_rejects_invalid_schema(tmp_path, line):
+    dataset = tmp_path / "invalid.jsonl"
+    dataset.write_text(line + "\\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="line 1"):
+        load_cases(dataset)
