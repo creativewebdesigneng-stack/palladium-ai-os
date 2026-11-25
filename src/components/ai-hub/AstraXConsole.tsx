@@ -92,7 +92,7 @@ export default function AstraXConsole() {
             {execution.isPending ? <Activity className="h-3.5 w-3.5 animate-pulse" /> : <Play className="h-3.5 w-3.5" />}
             {execution.isPending ? 'Running pinned model…' : 'Run test prompt'}
           </button>
-          {execution.isError && <div className="mt-3"><Failed message={friendlyMessage(execution.error)} /></div>}
+          {execution.isError && <div className="mt-3"><Failed message={friendlyMessage(execution.error)} onRetry={() => execution.mutate()} /></div>}
           {execution.isSuccess && (
             <div className="mt-4 rounded-xl border border-emerald-300/15 bg-emerald-300/[.045] p-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
