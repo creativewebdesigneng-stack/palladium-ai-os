@@ -20,10 +20,10 @@ const envKeys = [
 const originalEnv = Object.fromEntries(envKeys.map((key) => [key, process.env[key]]))
 
 beforeEach(() => {
-  process.env.BLACKSTAR_NATIVE_PRIMARY = 'true'
-  process.env.BLACKSTAR_NATIVE_MODEL = 'qwen3:8b-q4_K_M'
-  process.env.OPENAI_COMPATIBLE_BASE_URL = 'http://127.0.0.1:12780/v1'
-  delete process.env.OPENAI_COMPATIBLE_API_KEY
+  process.env['BLACKSTAR_NATIVE_PRIMARY'] = 'true'
+  process.env['BLACKSTAR_NATIVE_MODEL'] = 'qwen3:8b-q4_K_M'
+  process.env['OPENAI_COMPATIBLE_BASE_URL'] = 'http://127.0.0.1:12780/v1'
+  delete process.env['OPENAI_COMPATIBLE_API_KEY']
   mocks.runChatPinned.mockReset()
   mocks.runChatPinned.mockResolvedValue({
     text: 'local response',
