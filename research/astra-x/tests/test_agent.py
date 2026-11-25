@@ -169,6 +169,22 @@ def test_task_envelope_rejects_unbounded_budget_and_timezone_free_timestamp():
             actor_id="actor-001",
             task_kind=TaskKind.REASONING,
             objective="test",
-            created_at="2026-11-25T02:00:00",
+            created_at="2026-11-25T02:00:00Z",
             max_context_tokens=100_000,
+        )
+
+
+
+def test_task_envelope_requires_timezone_aware_timestamp():
+    from astra_x.core import TaskKind
+
+    with pytest.raises(ValueError, match="timezone"):
+        TaskEnvelope(
+            task_id="task-001",
+            trace_id="trace-001",
+            tenant_id="tenant-001",
+            actor_id="actor-001",
+            task_kind=TaskKind.REASONING,
+            objective="test",
+            created_at="2026-11-25T02:00:00",
         )
