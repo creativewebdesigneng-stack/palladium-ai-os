@@ -119,11 +119,21 @@ def validate_plan(
                 errors.append(f"Answer step {step.step_id} cannot contain tool details.")
             continue
 
-        if step.action == ActionKind.CODE_EXECUTION and not policy.allow_code_execution:
-            errors.append(f"Code execution is disabled for step {step.step_id}.")
+        if step.action == ActionKind.CODE_EXECUTION:
+            if not policy.allow_code_execution:
+                errors.append(f"Code execution is disabled for step {step.step_id}.")
+            elif step.step_id not in approved_step_ids:
+                approvals.append(step.step_id)
+            if step.tool_id is not None or step.arguments:
+                errors.append(f"Code step {step.step_id} cannot contain tool details.")
             continue
-        if step.action == ActionKind.NETWORK_REQUEST and not policy.allow_network_requests:
-            errors.append(f"Network requests are disabled for step {step.step_id}.")
+        if step.action == ActionKind.NETWORK_REQUEST:
+            if not policy.allow_network_requests:
+                errors.append(f"Network requests are disabled for step {step.step_id}.")
+            elif step.step_id not in approved_step_ids:
+                approvals.append(step.step_id)
+            if step.tool_id is not None or step.arguments:
+                errors.append(f"Network step {step.step_id} cannot contain tool details.")
             continue
 
         if step.action != ActionKind.TOOL_CALL:
